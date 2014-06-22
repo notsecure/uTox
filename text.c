@@ -1,13 +1,19 @@
 #include "main.h"
 
-static void drawtexth(int x, int y, char_t *str, uint16_t length, int d, int h, int hlen, uint16_t lineheight)
+static void drawtexth(int x, int y, char_t *str, uint16_t length, int d, int h, int hlen, uint16_t lineheight, int widthlimit)
 {
     h -= d;
     if(h + hlen < 0 || h > length) {
-        drawtext(x, y, str, length);
+        if (!widthlimit)
+            drawtext(x, y, str, length);
+        else
+            drawtextwidth(x, widthlimit, y, str, length);
         return;
     } else if(hlen == 0) {
-        drawtext(x, y, str, length);
+        if (!widthlimit)
+            drawtext(x, y, str, length);
+        else
+            drawtextwidth(x, widthlimit, y, str, length);
         int w =  textwidth(str, h + hlen);
         drawvline(x + w, y, y + lineheight, BLACK);
         return;
@@ -39,6 +45,10 @@ static void drawtexth(int x, int y, char_t *str, uint16_t length, int d, int h, 
     setcolor(color);
 
     drawtext(x + width, y, str + h + hlen, length - (h + hlen));
+    if (!widthlimit)
+        drawtext(x + width, y, str + h + hlen, length - (h + hlen));
+    else
+        drawtextwidth(x + width, widthlimit, y, str + h + hlen, length - (h + hlen));
 }
 
 int drawtextmultiline(int x, int right, int y, uint16_t lineheight, char_t *data, uint16_t length, uint16_t h, uint16_t hlen, _Bool multiline)
@@ -51,7 +61,7 @@ int drawtextmultiline(int x, int right, int y, uint16_t lineheight, char_t *data
             if(x + w > right) {
                 if(x != xc || *a == '\n') {
                     if(!multiline) {
-                        drawtexth(x, y, b, count, b - data, h, hlen, lineheight);
+                        drawtexth(x, y, b, count, b - data, h, hlen, lineheight, right-x);
                         return y + lineheight;
                     }
                     y += lineheight;
@@ -63,7 +73,7 @@ int drawtextmultiline(int x, int right, int y, uint16_t lineheight, char_t *data
                 w = textwidth(b, count);
             }
 
-            drawtexth(x, y, b, count, b - data, h, hlen, lineheight);
+            drawtexth(x, y, b, count, b - data, h, hlen, lineheight, right-x);
 
             x += w;
             b = a;
