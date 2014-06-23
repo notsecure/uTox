@@ -168,7 +168,7 @@ static void callback_file_data(Tox *tox, int32_t fid, uint8_t filenumber, uint8_
     uint64_t time = get_time();
     if(time - ft->lastupdate >= 1000 * 1000 * 50) {
         ft->lastupdate = time;
-        postmessage(FRIEND_FILE_IN_PROGRESS, fid, filenumber, (void*)ft->bytes);
+        postmessage(FRIEND_FILE_IN_PROGRESS, fid, filenumber, (void*)&ft->bytes);
     }
 }
 
@@ -523,7 +523,7 @@ void tox_thread(void *args)
                     if(time - ft->lastupdate >= 1000 * 1000 * 50 || ft->bytes - ft->lastprogress >= 1024 * 1024) {
                         ft->lastupdate = time;
                         ft->lastprogress = ft->bytes;
-                        postmessage(FRIEND_FILE_OUT_PROGRESS, ft->fid, ft->filenumber, (void*)ft->bytes);
+                        postmessage(FRIEND_FILE_OUT_PROGRESS, ft->fid, ft->filenumber, (void*)&ft->bytes);
                     }
                     if(ft->finish) {
                         tox_file_send_control(tox, ft->fid, 0, ft->filenumber, TOX_FILECONTROL_FINISHED, NULL, 0);
