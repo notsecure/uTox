@@ -230,6 +230,69 @@ void edit_char(uint32_t ch, _Bool control)
             break;
         }
 
+        case KEY_DOWN: {
+            if (edit_sel.start == edit->length)
+                break;
+            // Find x offset of cursor relative to start of text
+            uint8_t *lastNL = edit->data + edit_sel.start;
+            while (lastNL > edit->data && *(lastNL-utf8_unlen(lastNL))!='\n')
+                lastNL -= utf8_unlen(lastNL);
+            int curx = textwidth(lastNL, edit_sel.start - (lastNL-edit->data));
+
+            // Goto position closest to curx on the next line
+            uint8_t *nextPos = edit->data + edit_sel.start;
+            while (nextPos != edit->data+edit->length && *(nextPos-utf8_unlen(nextPos))!='\n')
+                nextPos += utf8_len(nextPos);
+            uint8_t *nextNL = nextPos;
+
+            int newx = textwidth(nextNL, nextPos-nextNL);
+            while (newx < curx && *nextPos!='\n' && nextPos != edit->data+edit->length)
+            {
+                nextPos += utf8_len(nextPos);
+                newx = textwidth(nextNL, nextPos-nextNL);
+            }
+
+            edit_sel.start = nextPos - edit->data;
+            edit_sel.length = 0;
+            break;
+        }
+
+        case KEY_UP: {
+            if (!edit_sel.start)
+                break;
+
+            // Find x offset of cursor relative to start of text
+            uint8_t *lastNL = edit->data + edit_sel.start;
+            while (lastNL > edit->data && *(lastNL-utf8_unlen(lastNL))!='\n')
+                lastNL -= utf8_unlen(lastNL);
+            int curx = textwidth(lastNL, edit_sel.start - (lastNL-edit->data));
+
+            // Goto position closest to curx on the previous line
+            uint8_t *nextPos = lastNL;
+            if (nextPos > edit->data)
+                nextPos -= utf8_unlen(nextPos);
+            while (nextPos > edit->data && *(nextPos-utf8_unlen(nextPos))!='\n')
+                nextPos -= utf8_unlen(nextPos);
+            uint8_t *prevNL = nextPos;
+
+            if (prevNL == lastNL)
+            {
+                edit_sel.start = edit_sel.length = 0;
+                break;
+            }
+
+            int newx = textwidth(prevNL, nextPos-prevNL);
+            while (newx < curx && *nextPos!='\n' && nextPos != edit->data+edit->length)
+            {
+                nextPos += utf8_len(nextPos);
+                newx = textwidth(prevNL, nextPos-prevNL);
+            }
+
+            edit_sel.start = nextPos - edit->data;
+            edit_sel.length = 0;
+            break;
+        }
+
         case KEY_RETURN: {
             if(edit->onenter) {
                 edit->onenter();
