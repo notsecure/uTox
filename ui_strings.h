@@ -1,7 +1,7 @@
 #define AFS(x) { .str = (uint8_t*)x, .length = sizeof(x) - 1 }
 
 static STRING addstatus[] = {
-    AFS("Friend request sent. Your friend will appear online when he accepts the request."),
+    AFS("Friend request sent. Your friend will appear online when they accept the request."),
     AFS("Attempting to resolve DNS name..."),
     AFS("Error: Invalid Tox ID"),
     AFS("Error: No Tox ID specified"),
