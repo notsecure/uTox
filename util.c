@@ -448,17 +448,34 @@ void rgbxtoyuv420(uint8_t *plane_y, uint8_t *plane_u, uint8_t *plane_v, uint8_t 
 
 void scale_rgbx_image(uint8_t *old_rgbx, uint16_t old_width, uint16_t old_height, uint8_t *new_rgbx, uint16_t new_width, uint16_t new_height)
 {
-    int x, y, i, x0, y0, a, b;
-    for(y = 0; y != new_height; y++) {
-        y0 = y * old_height / new_height;
-        for(x = 0; x != new_width; x++) {
-            x0 = x * old_width / new_width;
+    int x, y, i;
+    int x0, y0, x1, y1;
 
-            a = x + y*new_width;
-            b = x0 + y0*old_width;
-            new_rgbx[a*4  ] = old_rgbx[b*4  ];
-            new_rgbx[a*4+1] = old_rgbx[b*4+1];
-            new_rgbx[a*4+2] = old_rgbx[b*4+2];
+    float xf, yf;
+    float dxf, dyf;
+    float dx, dy;
+    dxf = (float)old_width / new_width;
+    dyf = (float)old_height / new_height;
+
+    for(y = 0, yf = 0; y != new_height; y++, yf += dyf) {
+        y0 = (int)yf;
+        y1 = y0+1<old_height ? y0+1 : old_height-1;
+        dy = yf - y0;
+
+        for(x = 0, xf = 0; x != new_width; x++, xf += dxf) {
+            x0 = (int)xf;
+            x1 = x0+1<old_width ? x0+1 : old_width-1;
+            dx = xf - x0;
+
+            for(i = 0; i < 3; i++) {
+                new_rgbx[(x+y*new_width)*4+i]
+                  = old_rgbx[(x0 + y0*old_width)*4+i]*(1-dx)*(1-dy)
+                  + old_rgbx[(x1 + y0*old_width)*4+i]*(  dx)*(1-dy)
+                  + old_rgbx[(x0 + y1*old_width)*4+i]*(1-dx)*(  dy)
+                  + old_rgbx[(x1 + y1*old_width)*4+i]*(  dx)*(  dy)
+                  ;
+                ;
+            }
         }
     }
 }
