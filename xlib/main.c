@@ -394,7 +394,15 @@ void openurl(char_t *str)
 {
     char cmd[1024];
     #ifdef __APPLE__
-    sprintf(cmd, "open \"%.999s\" &", str);
+    pid_t child = fork();
+    if (child == 0) {
+        puts("hi this is the child process, execling open now...");
+        execl("/usr/bin/open", "open", str, NULL);
+    } else if (child == -1) {
+        puts("rip: fork() failed");
+    } else {
+        return;
+    }
     #else
     sprintf(cmd, "xdg-open \"%.999s\" &", str);
     #endif
