@@ -644,10 +644,10 @@ void* loadsavedata(uint32_t *len)
 {
     char *home = getenv("HOME");
     char path[256];
-    sprintf(path, "%.230s/.config/tox/data", home);
+    sprintf(path, "%.230s/.config/tox/data/tox_save", home);
 
     void *data;
-    if((data = file_raw("tox_save", len))) {
+    if((data = file_raw(path, len))) {
         return data;
     }
 
@@ -662,6 +662,7 @@ void writesavedata(void *data, uint32_t len)
     path[l - 5] = 0;
     mkdir(path, 0700);
     path[l - 5] = '/';
+    sprintf(path, "%.230s/.config/tox/data/tox_save", home);
 
     FILE *file;
     /*file = fopen(path, "wb");
@@ -670,7 +671,7 @@ void writesavedata(void *data, uint32_t len)
         fclose(file);
     }*/
 
-    file = fopen("tox_save", "wb");
+    file = fopen(path, "wb");
     if(file) {
         fwrite(data, len, 1, file);
         fclose(file);
