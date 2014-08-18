@@ -180,7 +180,7 @@ uint16_t hittextmultiline(int mx, int right, int my, int height, uint16_t linehe
             x += w;
             b = a;
 
-            if(*a == '\n') {
+            if(*a == '\n' || *a == '\r') {
                 if(my >= 0 && my < lineheight) {
                     x = mx;
                     return a - str;
