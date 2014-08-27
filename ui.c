@@ -806,7 +806,9 @@ static void panel_draw_sub(PANEL *p, int x, int y, int width, int height)
 
 
     if(p->type) {
-        drawfunc[p->type - 1](p, x, y, width, height);
+        if(p->type != PANEL_EDIT || width > 15 * SCALE) {
+            drawfunc[p->type - 1](p, x, y, width, height);
+        }
     } else {
         if(p->drawfunc) {
             p->drawfunc(x, y, width, height);
