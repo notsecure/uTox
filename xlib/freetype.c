@@ -175,7 +175,7 @@ GLYPH* font_getglyph(FONT *f, uint32_t ch)
 
     g[1].ucs4 = ~0;
     FT_UInt index = FcFreeTypeCharIndex(i->face, ch);
-    FT_Load_Glyph(i->face, index, FT_LOAD_RENDER | (no_subpixel ? 0 : (ft_vert ? FT_LOAD_TARGET_LCD_V : FT_LOAD_TARGET_LCD)));
+    FT_Load_Glyph(i->face, index, FT_LOAD_RENDER | FT_LOAD_NO_BITMAP | (no_subpixel ? 0 : (ft_vert ? FT_LOAD_TARGET_LCD_V : FT_LOAD_TARGET_LCD)));
     FT_GlyphSlotRec *p = i->face->glyph;
 
     g->ucs4 = ch;
