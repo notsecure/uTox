@@ -20,7 +20,7 @@ LDFLAGS += $(shell pkg-config --libs dbus-1)
 endif
 LDFLAGS += $(shell pkg-config --libs libtoxcore)
 LDFLAGS += $(shell pkg-config --libs libtoxav)
-LDFLAGS += -lX11 -lXft -lXrender -lopenal -pthread -lm -lfontconfig -lv4lconvert -lvpx -lXext
+LDFLAGS += -lX11 -lXrender -lopenal -pthread -lm -lfontconfig -lv4lconvert -lvpx -lXext
 
 ifeq ($(UNAME_S),Linux)
 	LDFLAGS += -lresolv -ldl
