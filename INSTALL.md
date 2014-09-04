@@ -14,6 +14,11 @@ Dependencies on Debian Jessie:
 sudo apt-get install libv4l-dev libopenal-dev libfreetype6-dev libdbus-1-dev libxrender-dev libfontconfig1-dev libxext-dev
 ```
 
+Additional dependencies on Ubuntu 14.04:
+```bash
+sudo apt-get install libopus-dev libsodium-dev libvpx-dev
+```
+
 Compile:
 ```bash
 make all
