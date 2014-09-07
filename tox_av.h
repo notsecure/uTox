@@ -2,6 +2,7 @@
 static void av_start(int32_t call_index, void *arg)
 {
     ToxAvCSettings peer_settings;
+    PlaySound(NULL, 0, SND_ASYNC);
 
     int fid = toxav_get_peer_id(arg, call_index, 0);
     toxav_get_peer_csettings(arg, call_index, 0, &peer_settings);
@@ -52,7 +53,7 @@ static void callback_av_start(void *arg, int32_t call_index, void *userdata)
 static void callback_av_cancel(void *arg, int32_t call_index, void *userdata)
 {
     stopcall();
-
+    PlaySound(NULL, 0, SND_ASYNC);
     debug("A/V Cancel (%i)\n", call_index);
 }
 
