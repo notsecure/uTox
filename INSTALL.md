@@ -34,7 +34,7 @@ Note: building for Windows requires mingw-w64 (mingw lacks some header files), o
 
 > windres icons/icon.rc -O coff -o icon.res
 
-> gcc -o uTox.exe *.c ./png/png.c icon.res -lgdi32 -lmsimg32 -ldnsapi -lcomdlg32 -lopenal32 -lole32 -lstrmiids -loleaut32 -lvpx -ltoxav
+>  gcc -o uTox.exe *.c ./png/png.c icon.res -lgdi32 -lmsimg32 -ldnsapi -lcomdlg32 -lopenal32 -lole32 -lstrmiids -loleaut32 -lvpx -ltoxav -ltox.dll -lws2_32 -lwinmm 
 
 ### Xlib
 
@@ -54,8 +54,6 @@ If you are relying on Homebrew to provide libraries and headers, you can use the
 
 > cc -o uTox.o *.c png/png.c -L/usr/local/lib -I/usr/local/include -I/opt/X11/include -L/opt/X11/lib -lX11 -lXrender -lXext -ltoxcore -ltoxav -ltoxdns -framework OpenAL -pthread -lresolv -ldl -lm -lfontconfig -lfreetype -lvpx -I/opt/X11/include/freetype2
 
-<a name="windows" />
-## Windows
 
 <a name="android" />
 ## Android
