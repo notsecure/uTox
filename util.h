@@ -6,6 +6,9 @@
  */
 void* file_raw(char *path, uint32_t *size);
 
+//add null terminator to data
+void* file_text(char *path);
+
 /* returns non-zero if substring is found */
 _Bool strstr_case(const char *a, const char *b);
 
@@ -66,3 +69,8 @@ void rgbxtoyuv420(uint8_t *plane_y, uint8_t *plane_u, uint8_t *plane_v, uint8_t 
 /*
  */
 void scale_rgbx_image(uint8_t *old_rgbx, uint16_t old_width, uint16_t old_height, uint8_t *new_rgbx, uint16_t new_width, uint16_t new_height);
+
+/*
+ */
+UTOX_SAVE* config_load(void);
+void config_save(UTOX_SAVE *save);

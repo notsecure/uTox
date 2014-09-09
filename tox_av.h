@@ -254,7 +254,7 @@ static void video_thread(void *args)
                     if(call[i]) {
                         int r, len;
                         if((len = toxav_prepare_video_frame(av, i, lbuffer, sizeof(lbuffer), &input)) < 0) {
-                            debug("toxav_prepare_video_frame error %i\n", r);
+                            debug("toxav_prepare_video_frame error %i\n", len);
                             continue;
                         }
 
@@ -284,6 +284,7 @@ static void video_thread(void *args)
         closevideodevice(video_device);
     }
 
+    video_thread_msg = 0;
     video_thread_init = 0;
 }
 
@@ -355,7 +356,7 @@ static void sourceplaybuffer(int i, int16_t *data, int samples, uint8_t channels
     }
 
     ALuint bufid;
-    ALint processed, queued;
+    ALint processed = 0, queued = 16;
     alGetSourcei(source[i], AL_BUFFERS_PROCESSED, &processed);
     alGetSourcei(source[i], AL_BUFFERS_QUEUED, &queued);
     alSourcei(source[i], AL_LOOPING, AL_FALSE);
@@ -608,6 +609,7 @@ static void audio_thread(void *args)
     alcMakeContextCurrent(NULL);
     alcDestroyContext(context);
 
+    audio_thread_msg = 0;
     audio_thread_init = 0;
 }
 
@@ -615,7 +617,6 @@ static void callback_av_audio(ToxAv *av, int32_t call_index, int16_t *data, int 
 {
     ToxAvCSettings dest;
     if(toxav_get_peer_csettings(av, call_index, 0, &dest) == 0) {
-        debug("%u\n", dest.audio_channels);
         sourceplaybuffer(call_index + 1, data, samples, dest.audio_channels, dest.audio_sample_rate);
     }
 }

@@ -35,6 +35,7 @@ void friend_sendimage(FRIEND *f, void *data, void *pngdata, uint16_t width, uint
     msg->h = height;
     msg->zoom = 0;
     msg->data = data;
+    msg->position = 0.0;
 
     message_add(&messages_friend, (void*)msg, &f->msg);
 
@@ -55,6 +56,7 @@ void friend_recvimage(FRIEND *f, void *pngdata, uint32_t size)
     msg->h = height;
     msg->zoom = 0;
     msg->data = data;
+    msg->position = 0.0;
 
     message_add(&messages_friend, (void*)msg, &f->msg);
 }
@@ -129,4 +131,87 @@ void friend_add(char_t *name, uint16_t length, char_t *msg, uint16_t msg_length)
         addfriend_status = ADDF_DISCOVER;
         dns_request(name, length);
     }
+}
+
+void friend_free(FRIEND *f)
+{
+    int i = 0;
+    while(i != f->edit_history_length) {
+        free(f->edit_history[i]);
+        i++;
+    }
+    free(f->edit_history);
+
+    free(f->name);
+    free(f->status_message);
+    free(f->typed);
+
+    i = 0;
+    while(i < f->msg.n) {
+        MESSAGE *msg = f->msg.data[i];
+        if((msg->flags & (~1)) == 4) {
+            //MSG_IMG *img = (void*)msg;
+            //todo: free image
+        }
+        if((msg->flags & (~1)) == 6) {
+            MSG_FILE *file = (void*)msg;
+            free(file->path);
+            FILE_T *ft = &f->incoming[file->filenumber];
+            if(ft->data) {
+                if(ft->inline_png) {
+                    free(ft->data);
+                } else {
+                    fclose(ft->data);
+                    free(ft->path);
+                }
+            }
+
+            if(msg->flags & 1) {
+                ft->status = FT_NONE;
+            }
+        }
+        message_free(msg);
+        i++;
+    }
+
+    free(f->msg.data);
+
+    if(f->calling) {
+        toxaudio_postmessage(AUDIO_CALL_END, f->callid, 0, NULL);
+        if(f->calling == CALL_OK_VIDEO) {
+            toxvideo_postmessage(VIDEO_CALL_END, f->callid, 0, NULL);
+        }
+    }
+
+    memset(f, 0, sizeof(FRIEND));//
+}
+
+void group_free(GROUPCHAT *g)
+{
+    int i = 0;
+    while(i != g->edit_history_length) {
+        free(g->edit_history[i]);
+        i++;
+    }
+    free(g->edit_history);
+
+    uint8_t **np = g->peername;
+    i = 0;
+    while(i < g->peers) {
+        uint8_t *n = *np++;
+        if(n) {
+            free(n);
+            i++;
+        }
+    }
+
+    i = 0;
+    while(i < g->msg.n) {
+        free(g->msg.data[i]);
+        i++;
+    }
+
+    free(g->msg.data);
+
+    memset(g, 0, sizeof(GROUPCHAT));//
 }

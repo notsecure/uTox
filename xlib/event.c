@@ -1,5 +1,6 @@
 _Bool doevent(XEvent event)
 {
+    if(XFilterEvent(&event, None)) return 1;
     if(event.xany.window && event.xany.window != window) {
         if(event.type == ClientMessage) {
             XClientMessageEvent *ev = &event.xclient;
@@ -243,10 +244,14 @@ _Bool doevent(XEvent event)
         XKeyEvent *ev = &event.xkey;
         KeySym sym = XLookupKeysym(ev, 0);//XKeycodeToKeysym(display, ev->keycode, 0)
 
-        char buffer[16];
-        //int len;
+        wchar_t buffer[16];
+        int len;
 
-        XLookupString(ev, buffer, sizeof(buffer), &sym, NULL);
+        if (xic) {
+            len = XwcLookupString(xic, ev, buffer, sizeof(buffer), &sym, NULL);
+        } else {
+            len = XLookupString(ev, (char *)buffer, sizeof(buffer), &sym, NULL);
+        }
         if(edit_active()) {
             if(ev->state & 4) {
                 switch(sym) {
@@ -254,10 +259,10 @@ _Bool doevent(XEvent event)
                     paste();
                     return 1;
                 case 'c':
-                    copy();
+                    copy(0);
                     return 1;
                 case 'x':
-                    copy();
+                    copy(0);
                     edit_char(KEY_DEL, 1, 0);
                     return 1;
                 }
@@ -280,6 +285,11 @@ _Bool doevent(XEvent event)
                 sym -= 0xFF80;
             }
 
+            if(!sym) {
+              int i;
+              for(i = 0; i < len; i++)
+                edit_char(buffer[i], (ev->state & 4) != 0, ev->state);
+            }
             uint32_t key = keysym2ucs(sym);
             if(key != ~0) {
                 edit_char(key, (ev->state & 4) != 0, ev->state);
@@ -295,10 +305,10 @@ _Bool doevent(XEvent event)
         if(ev->state & 4) {
             if(sym == 'c') {
                 if(sitem->item == ITEM_FRIEND) {
-                    clipboard.len = messages_selection(&messages_friend, clipboard.data, sizeof(clipboard.data));
+                    clipboard.len = messages_selection(&messages_friend, clipboard.data, sizeof(clipboard.data), 1);
                     setclipboard();
                 } else if(sitem->item == ITEM_GROUP) {
-                    clipboard.len = messages_selection(&messages_group, clipboard.data, sizeof(clipboard.data));
+                    clipboard.len = messages_selection(&messages_group, clipboard.data, sizeof(clipboard.data), 1);
                     setclipboard();
                 }
                 break;
@@ -334,14 +344,13 @@ _Bool doevent(XEvent event)
         }
 
         debug("Type: %s\n", XGetAtomName(display, type));
-        debug("Poperty: %s\n", XGetAtomName(display, ev->property));
+        debug("Property: %s\n", XGetAtomName(display, ev->property));
 
         if(ev->property == XA_ATOM) {
             pastebestformat((Atom *)data, len, ev->selection);
         } else if(ev->property == XdndDATA) {
             char *path = malloc(len + 1);
-            formaturilist(path, (char*) data, len);
-            path[len] = 0;
+            formaturilist(path, (char*)data, len);
             tox_postmessage(TOX_SENDFILES, (FRIEND*)sitem->data - friend, 0xFFFF, path);
         } else if (type == XA_INCR) {
             if (pastebuf.data) {

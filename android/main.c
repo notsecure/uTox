@@ -101,7 +101,7 @@ uint64_t get_time(void)
     return ((uint64_t)ts.tv_sec * (1000 * 1000 * 1000)) + (uint64_t)ts.tv_nsec;
 }
 
-void copy(void)
+void copy(int value)
 {
 }
 
@@ -171,6 +171,11 @@ void writesavedata(void *data, uint32_t len)
         fclose(file);
         debug("Saved data\n");
     }
+}
+
+int datapath(uint8_t *dest)
+{
+    return 0;
 }
 
 void setscale(void)
@@ -440,6 +445,9 @@ static void android_main(void) /* main thread */
 
     dropdown_dpi.selected = dropdown_dpi.over = 2;
     ui_scale(3);
+
+    LANG = LANG_EN;
+    dropdown_language.selected = dropdown_language.over = LANG;
 
     while(!tox_thread_init) {
         yieldcpu(1);

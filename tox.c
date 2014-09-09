@@ -18,6 +18,126 @@ static volatile _Bool tox_thread_msg, audio_thread_msg, video_thread_msg;
 
 static FILE_T *file_t[256], **file_tend = file_t;
 
+void log_write(Tox *tox, int fid, const uint8_t *message, uint16_t length, _Bool self)
+{
+    if(!logging_enabled) {
+        return;
+    }
+
+    uint8_t path[512], *p;
+    uint8_t name[TOX_MAX_NAME_LENGTH];
+    int namelen;
+    uint8_t client_id[TOX_CLIENT_ID_SIZE];
+    FILE *file;
+
+    p = path + datapath(path);
+    tox_get_client_id(tox, fid, client_id);
+    cid_to_string(p, client_id); p += TOX_CLIENT_ID_SIZE * 2;
+    strcpy((char*)p, ".txt");
+
+    file = fopen((char*)path, "ab");
+    if(file) {
+        time_t rawtime;
+        time(&rawtime);
+
+        if(self) {
+            namelen = tox_get_self_name(tox, name);
+        } else if((namelen = tox_get_name(tox, fid, name)) == -1) {
+            //error reading name
+            namelen = 0;
+        }
+
+        struct {
+            uint64_t time;
+            uint16_t namelen, length;
+            uint8_t flags, zeroes[3];
+        } header = {
+            .time = rawtime,
+            .namelen = namelen,
+            .length = length,
+            .flags = self,
+        };
+
+        fwrite(&header, sizeof(header), 1, file);
+        fwrite(name, namelen, 1, file);
+        fwrite(message, length, 1, file);
+        fclose(file);
+    }
+}
+
+void log_read(Tox *tox, int fid)
+{
+    uint8_t path[512], *p, *pp, *end;
+    uint8_t client_id[TOX_CLIENT_ID_SIZE];
+    uint32_t size, i;
+
+    p = path + datapath(path);
+    tox_get_client_id(tox, fid, client_id);
+    cid_to_string(p, client_id); p += TOX_CLIENT_ID_SIZE * 2;
+    strcpy((char*)p, ".txt");
+
+    p = pp = file_raw((char*)path, &size);
+    if(!p) {
+        return;
+    }
+
+    end = p + size;
+
+    /* todo: some checks to avoid crashes with corrupted log files */
+    /* first find the last 128 messages in the log */
+    i = 0;
+    while(p < end) {
+        uint16_t namelen, length;
+        memcpy(&namelen, p + 8, 2);
+        memcpy(&length, p + 10, 2);
+        p += 16 + namelen + length;;
+
+        if(++i > 128) {
+            memcpy(&namelen, pp + 8, 2);
+            memcpy(&length, pp + 10, 2);
+            pp += 16 + namelen + length;
+        }
+    }
+
+    if(i > 128) {
+        i = 128;
+    }
+
+    MSG_DATA *m = &friend[fid].msg;
+    m->data = malloc(sizeof(void*) * i);
+    m->n = i;
+    i = 0;
+
+    /* add the messages */
+    p = pp;
+    while(p < end) {
+        uint64_t time;
+        uint16_t namelen, length;
+        uint8_t flags;
+        memcpy(&time, p, 8);
+        memcpy(&namelen, p + 8, 2);
+        memcpy(&length, p + 10, 2);
+        flags = p[12];
+        p += 16;
+
+        MESSAGE *msg = malloc(sizeof(MESSAGE) + length);
+        msg->flags = flags;
+        msg->length = length;
+        memcpy(msg->msg, p + namelen, length);
+
+        struct tm *ti;
+        time_t rawtime = time;
+        ti = localtime(&rawtime);
+
+        msg->time = ti->tm_hour * 60 + ti->tm_min;
+
+        m->data[i++] = msg;
+
+        debug("loaded backlog: %.*s: %.*s\n", namelen, p, length, p + namelen);
+        p += namelen + length;
+    }
+}
+
 static void fillbuffer(FILE_T *ft)
 {
     if(ft->inline_png) {
@@ -144,6 +264,10 @@ static void resetft(Tox *tox, FILE_T *ft, uint64_t start)
     } else {
         fseek(ft->data, start, SEEK_SET);
         fillbuffer(ft);
+    }
+
+    if(ft->status == FT_NONE) {
+        *file_tend++ = ft;
     }
 
     ft->bytes = start;
@@ -329,7 +453,7 @@ static void do_bootstrap(Tox *tox)
     int i = 0;
     while(i < 2) {
         struct bootstrap_node *d = &bootstrap_nodes[j % countof(bootstrap_nodes)];
-        tox_bootstrap_from_address(tox, d->address, 0, d->port, d->key);
+        tox_bootstrap_from_address(tox, d->address, d->port, d->key);
         i++;
         j++;
     }
@@ -359,10 +483,18 @@ static void set_callbacks(Tox *tox)
 
 static _Bool load_save(Tox *tox)
 {
+    uint8_t path[512], *p;
     uint32_t size;
-    void *data = loadsavedata(&size);
+
+    p = path + datapath(path);
+    strcpy((char*)p, "tox_save");
+
+    void *data = file_raw((char*)path, &size);
     if(!data) {
-        return 0;
+        data = file_raw("tox_save", &size);
+        if(!data) {
+            return 0;
+        }
     }
     int r = tox_load(tox, data, size);
     free(data);
@@ -391,6 +523,8 @@ static _Bool load_save(Tox *tox)
         f->status_message = malloc(size);
         tox_get_status_message(tox, i, f->status_message, size);
         f->status_length = size;
+
+        log_read(tox, i);
 
         i++;
     }
@@ -424,12 +558,65 @@ static void write_save(Tox *tox)
 {
     void *data;
     uint32_t size;
+    uint8_t path[512], *p;
+    FILE *file;
 
     size = tox_size(tox);
     data = malloc(size);
     tox_save(tox, data);
-    writesavedata(data, size);
+
+    p = path + datapath(path);
+    strcpy((char*)p, "tox_save");
+
+    file = fopen((char*)path, "wb");
+    if(file) {
+        fwrite(data, size, 1, file);
+        fclose(file);
+        debug("Saved data\n");
+    }
+
     free(data);
+}
+
+void tox_settingschanged(void)
+{
+    //free everything
+    tox_connected = 0;
+    list_freeall();
+
+    free(dropdown_audio_in.drop);
+    dropdown_audio_in.drop = NULL;
+    dropdown_audio_in.dropcount = 0;
+    dropdown_audio_in.over = 0;
+    dropdown_audio_in.selected = 0;
+
+    free(dropdown_audio_out.drop);
+    dropdown_audio_out.drop = NULL;
+    dropdown_audio_out.dropcount = 0;
+    dropdown_audio_out.over = 0;
+    dropdown_audio_out.selected = 0;
+
+    free(dropdown_video.drop);
+    dropdown_video.drop = NULL;
+    dropdown_video.dropcount = 0;
+    dropdown_video.over = 0;
+    dropdown_video.selected = 0;
+
+    dropdown_add(&dropdown_video, (uint8_t*)"None", NULL);
+    dropdown_add(&dropdown_video, (uint8_t*)"Desktop", (void*)1);
+
+
+    tox_thread_init = 0;
+
+    toxaudio_postmessage(AUDIO_KILL, 0, 0, NULL);
+    toxvideo_postmessage(VIDEO_KILL, 0, 0, NULL);
+    tox_postmessage(0, 1, 0, NULL);
+
+    while(!tox_thread_init) {
+        yieldcpu(1);
+    }
+
+    list_start();
 }
 
 void tox_thread(void *args)
@@ -438,14 +625,19 @@ void tox_thread(void *args)
     ToxAv *av;
     uint8_t id[TOX_FRIEND_ADDRESS_SIZE];
 
-    #ifdef IPV6_ENABLED
-    if((tox = tox_new(1)) == NULL) {
-        debug("tox_new(1) failed, trying without ipv6\n");
-    }
-    #endif
-    if(!tox && (tox = tox_new(0)) == NULL) {
-        debug("tox_new() failed\n");
-        exit(1);
+TOP:;
+    debug("new tox object ipv6: %u no_udp: %u proxy: %u %s %u\n", options.ipv6enabled, options.udp_disabled, options.proxy_enabled, options.proxy_address, options.proxy_port);
+    if((tox = tox_new(&options)) == NULL) {
+        debug("trying without proxy\n");
+        if(!options.proxy_enabled || (options.proxy_enabled = 0, (tox = tox_new(&options)) == NULL)) {
+            debug("trying without ipv6\n");
+            if(!options.ipv6enabled || (options.ipv6enabled = 0, (tox = tox_new(&options)) == NULL)) {
+                debug("tox_new() failed\n");
+                exit(1);
+            }
+            dropdown_ipv6.selected = dropdown_ipv6.over = 1;
+        }
+        dropdown_proxy.selected = dropdown_proxy.over = 0;
     }
 
     if(!load_save(tox)) {
@@ -476,7 +668,7 @@ void tox_thread(void *args)
     thread(audio_thread, av);
     thread(video_thread, av);
 
-    _Bool connected = 0;
+    _Bool connected = 0, reconfig;
     uint64_t last_save = get_time(), time;
     while(1) {
         tox_do(tox);
@@ -503,6 +695,8 @@ void tox_thread(void *args)
         if(tox_thread_msg) {
             TOX_MSG *msg = &tox_msg;
             if(!msg->msg) {
+                reconfig = msg->param1;
+                tox_thread_msg = 0;
                 break;
             }
             tox_thread_message(tox, av, msg->msg, msg->param1, msg->param2, msg->data);
@@ -556,6 +750,14 @@ void tox_thread(void *args)
                 p--;
                 file_tend--;
                 postmessage(FRIEND_FILE_OUT_STATUS, ft->fid, ft->filenumber, (void*)FILE_KILLED);
+                break;
+            }
+
+            case FT_NONE: {
+                memmove(p, p + 1, ((void*)file_tend - (void*)(p + 1)));
+                p--;
+                file_tend--;
+                break;
             }
 
             }
@@ -575,6 +777,10 @@ void tox_thread(void *args)
 
     toxav_kill(av);
     tox_kill(tox);
+
+    if(reconfig) {
+        goto TOP;
+    }
 
     tox_thread_init = 0;
 }
@@ -625,6 +831,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint8_t msg, uint16_t param1
         /* param1: friend #
          */
         tox_del_friend(tox, param1);
+        postmessage(FRIEND_DEL, 0, 0, data);
         break;
     }
 
@@ -642,6 +849,8 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint8_t msg, uint16_t param1
          * param2: message length
          * data: message
          */
+        log_write(tox, param1, data, param2, 1);
+
         void *p = data;
         while(param2 > TOX_MAX_MESSAGE_LENGTH) {
             uint16_t len = TOX_MAX_MESSAGE_LENGTH - utf8_unlen(p + TOX_MAX_MESSAGE_LENGTH);
@@ -1052,6 +1261,12 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
         break;
     }
 
+    case FRIEND_DEL: {
+        friend_free(data);
+        friends--;
+        break;
+    }
+
     case FRIEND_MESSAGE: {
         friend_addmessage(&friend[param1], data);
         redraw();
@@ -1233,6 +1448,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
         msg->progress = 0;
         msg->speed = 0;
         msg->inline_png = 0;
+        msg->path = NULL;
         memcpy(msg->name, ft->name, msg->name_length);
 
         friend_addmessage(f, msg);
@@ -1257,6 +1473,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
         msg->progress = 0;
         msg->speed = 0;
         msg->inline_png = 1;
+        msg->path = NULL;
         memcpy(msg->name, ft->name, msg->name_length);
 
         friend_addmessage(f, msg);
@@ -1284,6 +1501,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
         msg->progress = 0;
         msg->speed = 0;
         msg->inline_png = inline_png;
+        msg->path = NULL;
         memcpy(msg->name, ft->name, msg->name_length);
         msg->name[msg->name_length] = 0;
 

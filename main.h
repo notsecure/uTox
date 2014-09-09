@@ -18,21 +18,25 @@
 #define countof(x) (sizeof(x)/sizeof(*(x)))
 #define volatile(x) (*((volatile typeof(x)*)&x))
 
-#define IPV6_ENABLED
 #define DEFAULT_NAME "Tox User"
 #define DEFAULT_STATUS "Toxing on uTox"
 #define DEFAULT_ADD_MESSAGE "Please accept this friend request."
 #define DEFAULT_SCALE 2
 
-#define VERSION "0.0.9"
+#define VERSION "0.1.3"
 
 #define MAX_CALLS 16
 
 typedef struct
 {
-    uint8_t version, scale;
+    uint8_t version, scale, enableipv6, disableudp;
     uint16_t window_x, window_y, window_width, window_height;
+    uint16_t proxy_port;
+    uint8_t proxyenable, logging_enabled;
+    uint8_t proxy_ip[0];
 }UTOX_SAVE;
+
+#define SAVE_VERSION 2
 
 typedef struct
 {
@@ -105,6 +109,8 @@ _Bool tox_connected;
 
 _Bool audio_preview, video_preview;
 
+volatile _Bool logging_enabled;
+
 //friends and groups
 //note: assumes array size will always be large enough
 FRIEND friend[256];
@@ -137,6 +143,8 @@ struct {
 int font_small_lineheight, font_msg_lineheight;
 
 uint16_t video_width, video_height, max_video_width, max_video_height;
+
+Tox_Options options;
 
 enum
 {
@@ -201,8 +209,6 @@ enum
 
 void drawalpha(int bm, int x, int y, int width, int height, uint32_t color);
 void loadalpha(int bm, void *data, int width, int height);
-void* loadsavedata(uint32_t *len);
-void writesavedata(void *data, uint32_t len);
 void desktopgrab(_Bool video);
 void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_length);
 void setscale(void);
@@ -210,6 +216,9 @@ void drawimage(void *data, int x, int y, int width, int height, int maxwidth, _B
 void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size);
 void showkeyboard(_Bool show);
 void redraw(void);
+
+int datapath(uint8_t *dest);
+void config_osdefaults(UTOX_SAVE *r);
 
 //me
 struct
@@ -268,7 +277,7 @@ void thread(void func(void*), void *args);
 void yieldcpu(uint32_t ms);
 uint64_t get_time(void);
 
-void copy(void);
+void copy(int value);
 void paste(void);
 
 void address_to_clipboard(void);

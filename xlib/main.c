@@ -24,6 +24,8 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <locale.h>
+
 #include <dlfcn.h>
 
 #include "audio.c"
@@ -80,6 +82,8 @@ Picture colorpic;
 _Bool _redraw;
 
 uint16_t drawwidth, drawheight;
+
+XIC xic = NULL;
 
 XImage *screen_image;
 
@@ -230,7 +234,7 @@ static int _drawtext(int x, int xmax, int y, uint8_t *str, uint16_t length)
 
         g = font_getglyph(sfont, ch);
         if(g) {
-            if(x + g->xadvance > xmax) {
+            if(x + g->xadvance + SCALE * 5 > xmax && length) {
                 return -x;
             }
 
@@ -383,27 +387,14 @@ void address_to_clipboard(void)
 
 void openurl(char_t *str)
 {
-    char cmd[1024], *p = cmd;
-
-    #ifdef __APPLE__
-    p += sprintf(p, "open \"");
-    #else
-    p += sprintf(p, "xdg-open \"");
-    #endif
-
-    while(*str) {
-        if(*str == '"' || *str == '\\') {
-            *p++ = '\\';
-        }
-        *p++ = *str++;
+    char *cmd = "xdg-open";
+#ifdef __APPLE__
+    cmd = "open";
+#endif
+    if(!fork()) {
+        execlp(cmd, cmd, str, (char *)0);
+        exit(127);
     }
-    *p++ = '\"';
-    *p++ = ' ';
-    *p++ = '&';
-    *p = 0;
-
-    debug("cmd: %s\n", cmd);
-    system(cmd);
 }
 
 void openfilesend(void)
@@ -464,10 +455,22 @@ static void pasteprimary(void)
     }
 }
 
-void copy(void)
+void copy(int value)
 {
-    clipboard.len = edit_copy(clipboard.data, sizeof(clipboard.data));
-    setclipboard();
+    int len;
+    if(edit_active()) {
+        len = edit_copy(clipboard.data, sizeof(clipboard.data));
+    } else if(sitem->item == ITEM_FRIEND) {
+        len = messages_selection(&messages_friend, clipboard.data, sizeof(clipboard.data), value);
+    } else {
+        len = messages_selection(&messages_group, clipboard.data, sizeof(clipboard.data), value);
+    }
+
+    if(len) {
+        clipboard.len = len;
+        setclipboard();
+    }
+
 }
 
 void paste(void)
@@ -548,7 +551,7 @@ static void formaturilist(char *out, const char *in, int len) {
     }
 
     out[len - removed] = 0;
-    out[len - removed - 1] = '\n';
+    //out[len - removed - 1] = '\n';
 }
 
 static void pastedata(void *data, Atom type, int len, _Bool select)
@@ -567,7 +570,7 @@ static void pastedata(void *data, Atom type, int len, _Bool select)
             friend_sendimage((FRIEND*)sitem->data, img, pngdata, width, height);
         }
     } else if (type == XA_URI_LIST) {
-        char *path = malloc(len + 2);
+        char *path = malloc(len + 1);
         formaturilist(path, (char*) data, len);
         tox_postmessage(TOX_SENDFILES, (FRIEND*)sitem->data - friend, 0xFFFF, path);
     } else if(type == XA_UTF8_STRING && edit_active()) {
@@ -640,41 +643,14 @@ void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size)
     return (void*)picture;
 }
 
-void* loadsavedata(uint32_t *len)
+int datapath(uint8_t *dest)
 {
     char *home = getenv("HOME");
-    char path[256];
-    sprintf(path, "%.230s/.config/tox/data", home);
+    int l = sprintf((char*)dest, "%.230s/.config/tox", home);
+    mkdir((char*)dest, 0700);
+    dest[l++] = '/';
 
-    void *data;
-    if((data = file_raw("tox_save", len))) {
-        return data;
-    }
-
-    return file_raw(path, len);
-}
-
-void writesavedata(void *data, uint32_t len)
-{
-    char *home = getenv("HOME");
-    char path[256];
-    int l = sprintf(path, "%.230s/.config/tox/data", home);
-    path[l - 5] = 0;
-    mkdir(path, 0700);
-    path[l - 5] = '/';
-
-    FILE *file;
-    /*file = fopen(path, "wb");
-    if(file) {
-        fwrite(data, len, 1, file);
-        fclose(file);
-    }*/
-
-    file = fopen("tox_save", "wb");
-    if(file) {
-        fwrite(data, len, 1, file);
-        fclose(file);
-    }
+    return l;
 }
 
 void setscale(void)
@@ -745,26 +721,58 @@ void redraw(void)
 int depth;
 Screen *scr;
 
-static UTOX_SAVE* loadconfig(void)
+void config_osdefaults(UTOX_SAVE *r)
 {
-    UTOX_SAVE *r = file_raw("utox_save", NULL);
-    if(r) {
-        if(r->version == 0) {
-            return r;
-        } else {
-            free(r);
-            r = NULL;
-        }
-    }
-
-    r = malloc(sizeof(UTOX_SAVE));
-    r->version = 0;
-    r->scale = DEFAULT_SCALE - 1;
     r->window_x = 0;
     r->window_y = 0;
     r->window_width = DEFAULT_WIDTH;
     r->window_height = DEFAULT_HEIGHT;
-    return r;
+}
+
+static int systemlang(void)
+{
+    char *str = getenv("LC_MESSAGES");
+    if(!str) {
+        str = getenv("LANG");
+    }
+    if(!str) {
+        return LANG_EN;
+    }
+    if(strstr(str, "de")) {
+        return LANG_DE;
+    }
+    if(strstr(str, "es")) {
+        return LANG_ES;
+    }
+    if(strstr(str, "fr")) {
+        return LANG_FR;
+    }
+    if(strstr(str, "it")) {
+        return LANG_IT;
+    }
+    if(strstr(str, "ja")) {
+        return LANG_JA;
+    }
+    if(strstr(str, "lv")) {
+        return LANG_LV;
+    }
+    if(strstr(str, "nl")) {
+        return LANG_NL;
+    }
+    if(strstr(str, "pl")) {
+        return LANG_PL;
+    }
+    if(strstr(str, "ru")) {
+        return LANG_RU;
+    }
+    if(strstr(str, "uk")) {
+        return LANG_UA;
+    }
+    if(strstr(str, "zh_CN")) {
+        return LANG_CN;
+    }
+
+    return LANG_EN;
 }
 
 int main(int argc, char *argv[])
@@ -783,6 +791,13 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    XIM xim;
+    setlocale(LC_ALL, "");
+    XSetLocaleModifiers("");
+    if((xim = XOpenIM(display, 0, 0, 0)) == NULL) {
+        printf("Cannot open input method\n");
+    }
+
     screen = DefaultScreen(display);
     cmap = DefaultColormap(display, screen);
     visual = DefaultVisual(display, screen);
@@ -799,7 +814,7 @@ int main(int argc, char *argv[])
     };
 
     /* load save data */
-    UTOX_SAVE *save = loadconfig();
+    UTOX_SAVE *save = config_load();
 
     /* create window */
     window = XCreateWindow(display, RootWindow(display, screen), save->window_x, save->window_y, save->window_width, save->window_height, 0, depth, InputOutput, visual, CWBackPixmap | CWBorderPixel | CWEventMask, &attrib);
@@ -863,7 +878,6 @@ int main(int argc, char *argv[])
     initfonts();
 
     /* load fonts and scalable bitmaps */
-    dropdown_dpi.selected = dropdown_dpi.over = save->scale;
     ui_scale(save->scale + 1);
 
     /* done with save */
@@ -901,12 +915,23 @@ int main(int argc, char *argv[])
     xrcolor.alpha = 0xffff;
     XftColorAllocValue(display, visual, cmap, &xrcolor, &xftcolor);*/
 
+    LANG = systemlang();
+    dropdown_language.selected = dropdown_language.over = LANG;
+
     /* set-up desktop video input */
     dropdown_add(&dropdown_video, (uint8_t*)"None", NULL);
     dropdown_add(&dropdown_video, (uint8_t*)"Desktop", (void*)1);
 
     /* make the window visible */
     XMapWindow(display, window);
+
+    if (xim) {
+        if((xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, window, XNFocusWindow, window, NULL)) == NULL) {
+            printf("Cannot open input method\n");
+            XCloseIM(xim);
+        }
+        XSetICFocus(xic);
+    }
 
     /* set the width/height of the drawing region */
     width = DEFAULT_WIDTH;
@@ -965,19 +990,13 @@ int main(int argc, char *argv[])
     XTranslateCoordinates(display, window, root_return, 0, 0, &x_return, &y_return, &child_return);
 
     UTOX_SAVE d = {
-        .version = 0,
-        .scale = SCALE - 1,
         .window_x = x_return < 0 ? 0 : x_return,
         .window_y = y_return < 0 ? 0 : y_return,
         .window_width = width_return,
         .window_height = height_return,
     };
 
-    FILE *file = fopen("utox_save", "wb");
-    if(file) {
-        fwrite(&d, sizeof(d), 1, file);
-        fclose(file);
-    }
+    config_save(&d);
 
     FcFontSetSortDestroy(fs);
     freefonts();
@@ -988,6 +1007,9 @@ int main(int argc, char *argv[])
 
     XRenderFreePicture(display, renderpic);
     XRenderFreePicture(display, colorpic);
+
+    if (xic) XDestroyIC(xic);
+    if (xim) XCloseIM(xim);
 
     XDestroyWindow(display, window);
     XCloseDisplay(display);

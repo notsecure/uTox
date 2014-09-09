@@ -7,6 +7,8 @@
 #define WINVER 0x410
 #endif
 
+#define STRSAFE_NO_DEPRECATE
+
 #include <windows.h>
 #include <windowsx.h>
 
@@ -35,6 +37,8 @@ extern const CLSID CLSID_NullRenderer;
 #include "audio.c"
 
 #include <process.h>
+
+#include <shlobj.h>
 
 #undef CLEARTYPE_QUALITY
 #define CLEARTYPE_QUALITY 5
@@ -593,20 +597,18 @@ static void sendbitmap(HDC mem, HBITMAP hbm, int width, int height)
 
     GetDIBits(mem, hbm, 0, height, bits, &info, DIB_RGB_COLORS);
 
-    if(width & 3) {
-        uint8_t pbytes = width & 3, *p = bits, *pp = bits, *end = p + width * height * 3;
-        uint32_t offset = 0;
-        while(p != end) {
-            int i;
-            for(i = 0; i != width; i++) {
-                uint8_t b = pp[i * 3];
-                p[i * 3] = pp[i * 3 + 2];
-                p[i * 3 + 1] = pp[i * 3 + 1];
-                p[i * 3 + 2] = b;
-            }
-            p += width * 3;
-            pp += width * 3 + pbytes;
+    uint8_t pbytes = width & 3, *p = bits, *pp = bits, *end = p + width * height * 3;
+    uint32_t offset = 0;
+    while(p != end) {
+        int i;
+        for(i = 0; i != width; i++) {
+            uint8_t b = pp[i * 3];
+            p[i * 3] = pp[i * 3 + 2];
+            p[i * 3 + 1] = pp[i * 3 + 1];
+            p[i * 3 + 2] = b;
         }
+        p += width * 3;
+        pp += width * 3 + pbytes;
     }
 
     uint8_t *out;
@@ -623,7 +625,7 @@ static void sendbitmap(HDC mem, HBITMAP hbm, int width, int height)
     friend_sendimage(sitem->data, hbm, data, width, height);
 }
 
-void copy(void)
+void copy(int value)
 {
     uint8_t data[32768];//!
     int len;
@@ -632,9 +634,9 @@ void copy(void)
         len = edit_copy(data, 32767);
         data[len] = 0;
     } else if(sitem->item == ITEM_FRIEND) {
-        len = messages_selection(&messages_friend, data, 32768);
+        len = messages_selection(&messages_friend, data, 32768, value);
     } else if(sitem->item == ITEM_GROUP) {
-        len = messages_selection(&messages_group, data, 32768);
+        len = messages_selection(&messages_group, data, 32768, value);
     } else {
         return;
     }
@@ -727,23 +729,17 @@ void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size)
     return bm;
 }
 
-void* loadsavedata(uint32_t *len)
+int datapath(uint8_t *dest)
 {
-    int end = GetCurrentDirectory(sizeof(save_path) - 16, save_path);
-    memcpy(save_path + end, "\\tox_save", 9);
-
-    return file_raw(save_path, len);
-}
-
-void writesavedata(void *data, uint32_t len)
-{
-    FILE *file;
-    file = fopen(save_path, "wb");
-    if(file) {
-        fwrite(data, len, 1, file);
-        fclose(file);
-        debug("Saved data\n");
+    if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, (char*)dest))) {
+        uint8_t *p = dest + strlen((char*)dest);
+        strcpy(p, "\\Tox"); p += 4;
+        CreateDirectory((char*)dest, NULL);
+        *p++ = '\\';
+        return p - dest;
     }
+
+    return 0;
 }
 
 void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_length)
@@ -793,14 +789,11 @@ void desktopgrab(_Bool video)
 
     debug("result: %i %i %i %i\n", x, y, w, h);
 
-    capturewnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_LAYERED, L"uToxgrab", L"Tox", WS_POPUP, x, y, w, h, NULL, NULL, hinstance, NULL);
+    capturewnd = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_LAYERED, L"uToxgrab", L"Tox", WS_POPUP, x, y, w, h, NULL, NULL, hinstance, NULL);
     if(!capturewnd) {
         debug("CreateWindowExW() failed\n");
         return;
     }
-
-    HDC hdc = GetDC(capturewnd);
-    BitBlt(hdc, 0, 0, w, h, hdc, 0, 0, BLACKNESS);
 
     SetLayeredWindowAttributes(capturewnd, 0xFFFFFF, 128, LWA_ALPHA | LWA_COLORKEY);
 
@@ -835,6 +828,7 @@ LRESULT CALLBACK GrabProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             grabpx = p.x;
             grabpy = p.y;
             BitBlt(hdc, grabx, graby, grabpx - grabx, grabpy - graby, hdc, grabx, graby, WHITENESS);
+            ReleaseDC(hwnd, hdc);
         }
 
         return 0;
@@ -950,36 +944,12 @@ void setscale(void)
     svg_draw(1);
 }
 
-static UTOX_SAVE* loadconfig(void)
+void config_osdefaults(UTOX_SAVE *r)
 {
-    UTOX_SAVE *r = file_raw("utox_save", NULL);
-    if(r) {
-        if(r->version == 0) {
-            /* validate values */
-            if(r->scale > 4) {
-                r->scale = 4;
-            }
-
-            if(r->window_x > GetSystemMetrics(SM_CXSCREEN) || r->window_width > GetSystemMetrics(SM_CXSCREEN)
-               || r->window_y > GetSystemMetrics(SM_CYSCREEN) || r->window_height > GetSystemMetrics(SM_CYSCREEN)) {
-                goto SET_DEFAULTS;
-            }
-            return r;
-        } else {
-            free(r);
-            r = NULL;
-        }
-    }
-
-    r = malloc(sizeof(UTOX_SAVE));
-    r->version = 0;
-    r->scale = DEFAULT_SCALE - 1;
-SET_DEFAULTS:
     r->window_x = (GetSystemMetrics(SM_CXSCREEN) - MAIN_WIDTH) / 2;
     r->window_y = (GetSystemMetrics(SM_CYSCREEN) - MAIN_HEIGHT) / 2;
     r->window_width = MAIN_WIDTH;
     r->window_height = MAIN_HEIGHT;
-    return r;
 }
 
 #include "dnd.c"
@@ -1036,6 +1006,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
         .hInstance = hInstance,
         .hIcon = myicon,
         .lpszClassName = popupclassname,
+        .hbrBackground = (HBRUSH)GetStockObject (BLACK_BRUSH),
     };
 
     NOTIFYICONDATA nid = {
@@ -1046,16 +1017,53 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
         .cbSize = sizeof(nid),
     };
 
-
     OleInitialize(NULL);
     RegisterClassW(&wc);
     RegisterClassW(&wc2);
 
-    UTOX_SAVE *save = loadconfig();
+    uint8_t langid = GetUserDefaultUILanguage() & 0xFF;
+    switch(langid) {
+    default:
+    case 0x07:
+        LANG = LANG_DE;
+        break;
+    case 0x09:
+        LANG = LANG_EN;
+        break;
+    case 0x0A:
+        LANG = LANG_ES;
+        break;
+    case 0x0C:
+        LANG = LANG_FR;
+        break;
+    case 0x10:
+        LANG = LANG_IT;
+        break;
+    case 0x11:
+        LANG = LANG_JA;
+        break;
+    case 0x13:
+        LANG = LANG_NL;
+        break;
+    case 0x15:
+        LANG = LANG_PL;
+        break;
+    case 0x19:
+        LANG = LANG_RU;
+	break;
+    case 0x22:
+        LANG = LANG_UA;
+        break;
+    case 0x26:
+        LANG = LANG_LV;
+        break;
+    }
 
-    dropdown_dpi.selected = dropdown_dpi.over = save->scale;
+    dropdown_language.selected = dropdown_language.over = LANG;
 
-    hwnd = CreateWindowExW(0, classname, L"Tox", WS_OVERLAPPEDWINDOW, save->window_x, save->window_y, save->window_width, save->window_height, NULL, NULL, hInstance, NULL);
+    UTOX_SAVE *save = config_load();
+
+    hwnd = CreateWindowExW(0, classname, L"Tox", WS_OVERLAPPEDWINDOW, save->window_x, save->window_y, MAIN_WIDTH, MAIN_HEIGHT, NULL, NULL, hInstance, NULL);
 
     free(save);
 
@@ -1152,27 +1160,17 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
 
     switch(msg) {
     case WM_DESTROY: {
-        FILE *file = fopen("utox_save", "wb");
-        if(!file) {
-            PostQuitMessage(0);
-            return 0;
-        }
-
         RECT wndrect = {0};
         GetWindowRect(hwnd, &wndrect);
 
         UTOX_SAVE d = {
-            .version = 0,
-            .scale = SCALE - 1,
             .window_x = wndrect.left < 0 ? 0 : wndrect.left,
             .window_y = wndrect.top < 0 ? 0 : wndrect.top,
             .window_width = (wndrect.right - wndrect.left),
             .window_height = (wndrect.bottom - wndrect.top),
         };
 
-        fwrite(&d, sizeof(d), 1, file);
-        fclose(file);
-
+        config_save(&d);
         PostQuitMessage(0);
         return 0;
     }
@@ -1271,7 +1269,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         _Bool shift = ((GetKeyState(VK_SHIFT) & 0x80) != 0);
 
         if(control && wParam == 'C') {
-            copy();
+            copy(1);
             return 0;
         }
 
@@ -1282,7 +1280,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
                     paste();
                     return 0;
                 case 'X':
-                    copy();
+                    copy(0);
                     edit_char(KEY_DEL, 1, 0);
                     return 0;
                 }
@@ -1492,7 +1490,19 @@ void video_frame(uint32_t id, uint8_t *img_data, uint16_t width, uint16_t height
             .bottom = height
         };
         AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, 0);
-        SetWindowPos(video_hwnd[id], 0, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOZORDER | SWP_NOMOVE);
+
+        int width, height;
+        width = r.right - r.left;
+        height = r.bottom - r.top;
+        if(width > GetSystemMetrics(SM_CXSCREEN)) {
+            width = GetSystemMetrics(SM_CXSCREEN);
+        }
+
+        if(height > GetSystemMetrics(SM_CYSCREEN)) {
+            height = GetSystemMetrics(SM_CYSCREEN);
+        }
+
+        SetWindowPos(video_hwnd[id], 0, 0, 0, width, height, SWP_NOZORDER | SWP_NOMOVE);
     }
 
     BITMAPINFO bmi = {
@@ -1537,13 +1547,21 @@ void video_begin(uint32_t id, uint8_t *name, uint16_t name_length, uint16_t widt
         .bottom = height
     };
     AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, 0);
-    *h = CreateWindowExW(0, L"uTox", out, WS_OVERLAPPEDWINDOW, 0, 0, r.right - r.left, r.bottom - r.top, NULL, NULL, hinstance, NULL);
 
+    width = r.right - r.left;
+    height = r.bottom - r.top;
 
+    if(width > GetSystemMetrics(SM_CXSCREEN)) {
+        width = GetSystemMetrics(SM_CXSCREEN);
+    }
+
+    if(height > GetSystemMetrics(SM_CYSCREEN)) {
+        height = GetSystemMetrics(SM_CYSCREEN);
+    }
+
+    *h = CreateWindowExW(0, L"uTox", out, WS_OVERLAPPEDWINDOW, 0, 0, width, height, NULL, NULL, hinstance, NULL);
 
     ShowWindow(*h, SW_SHOW);
-
-
 }
 
 void video_end(uint32_t id)

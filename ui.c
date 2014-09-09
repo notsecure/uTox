@@ -39,11 +39,11 @@ static void drawfriend(int x, int y, int w, int height)
 
     setcolor(C_TITLE);
     setfont(FONT_TITLE);
-    drawtextrange(LIST_RIGHT + 30 * SCALE, width - 62 * SCALE, 9 * SCALE, f->name, f->name_length);
+    drawtextrange(LIST_RIGHT + 30 * SCALE, width - 92 * SCALE, 9 * SCALE, f->name, f->name_length);
 
     setcolor(LIST_MAIN);
     setfont(FONT_STATUS);
-    drawtextrange(LIST_RIGHT + 30 * SCALE, width - 62 * SCALE, 16 * SCALE, f->status_message, f->status_length);
+    drawtextrange(LIST_RIGHT + 30 * SCALE, width - 92 * SCALE, 16 * SCALE, f->status_message, f->status_length);
 }
 
 static void drawgroup(int x, int y, int w, int height)
@@ -94,7 +94,7 @@ static void drawfriendreq(int x, int y, int width, int height)
     drawstr(LIST_RIGHT + SCALE * 5, SCALE * 10, FRIENDREQUEST);
 }
 
-static void drawadd(int x, int y, int width, int height)
+static void drawadd(int x, int y, int w, int height)
 {
     setcolor(C_TITLE);
     setfont(FONT_SELF_NAME);
@@ -110,7 +110,7 @@ static void drawadd(int x, int y, int width, int height)
         setfont(FONT_MISC);
         setcolor(C_RED);
         STRING *str = &strings[LANG][REQ_STRING_1 + addfriend_status - 1];
-        drawtext(LIST_RIGHT + SCALE * 5, LIST_Y + SCALE * 83, str->str, str->length);
+        drawtextmultiline(LIST_RIGHT + SCALE * 5, width - BM_SBUTTON_WIDTH - 5 * SCALE, LIST_Y + SCALE * 83, 0, height, font_small_lineheight, str->str, str->length, 0xFFFF, 0, 1);
     }
 }
 
@@ -143,6 +143,16 @@ static void drawsettings_content(int x, int y, int w, int height)
 
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 206, DPI);
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 230, LANGUAGE);
+    drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 254, NETWORK);
+
+    drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 266, IPV6);
+    drawstr(LIST_RIGHT + SCALE * 5 + 50 * SCALE, y + SCALE * 266, UDP);
+
+    drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 278, PROXY);
+
+    drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 310, LOGGING);
+
+    drawtext(LIST_RIGHT + SCALE * 132, y + SCALE * 290, (uint8_t*)":", 1);
 
     setfont(FONT_SELF_NAME);
 
@@ -153,6 +163,10 @@ static void drawsettings_content(int x, int y, int w, int height)
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 113, DEVICESELECTION);
 
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 195, OTHERSETTINGS);
+
+    setfont(FONT_MISC);
+    setcolor(C_RED);
+    drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 302, WARNING);
 }
 
 static void background_draw(PANEL *p, int x, int y, int width, int height)
@@ -261,9 +275,11 @@ panel_settings = {
     .child = (PANEL*[]) {
         (void*)&button_copyid,
         (void*)&button_callpreview, (void*)&button_videopreview,
-        (void*)&edit_name, (void*)&edit_status, (void*)&edit_toxid,
+        (void*)&edit_name, (void*)&edit_status, (void*)&edit_toxid, (void*)&edit_proxy_ip,
+        (void*)&edit_proxy_port,
         (void*)&dropdown_audio_in, (void*)&dropdown_audio_out, (void*)&dropdown_video,
-        (void*)&dropdown_dpi, (void*)&dropdown_language,
+        (void*)&dropdown_dpi, (void*)&dropdown_language, (void*)&dropdown_proxy,
+        (void*)&dropdown_ipv6, (void*)&dropdown_udp, (void*)&dropdown_logging,
         NULL
     }
 },
@@ -596,6 +612,38 @@ void ui_scale(uint8_t scale)
         .y = SEARCH_Y,
         .height = 12 * SCALE,
         .width = SCALE * 25,
+    },
+
+    d_proxy = {
+        .type = PANEL_DROPDOWN,
+        .x = 5 * SCALE,
+        .y = SCALE * 288,
+        .height = SCALE * 12,
+        .width = SCALE * 60
+    },
+
+    d_ipv6 = {
+        .type = PANEL_DROPDOWN,
+        .x = 24 * SCALE,
+        .y = SCALE * 264,
+        .height = SCALE * 12,
+        .width = SCALE * 20
+    },
+
+    d_udp = {
+        .type = PANEL_DROPDOWN,
+        .x = 74 * SCALE,
+        .y = SCALE * 264,
+        .height = SCALE * 12,
+        .width = SCALE * 20
+    },
+
+    d_logging = {
+        .type = PANEL_DROPDOWN,
+        .x = 5 * SCALE,
+        .y = SCALE * 320,
+        .height = SCALE * 12,
+        .width = SCALE * 20
     };
 
     dropdown_audio_in.panel = d_audio_in;
@@ -604,6 +652,10 @@ void ui_scale(uint8_t scale)
     dropdown_dpi.panel = d_dpi;
     dropdown_language.panel = d_language;
     dropdown_filter.panel = d_filter;
+    dropdown_proxy.panel = d_proxy;
+    dropdown_ipv6.panel = d_ipv6;
+    dropdown_udp.panel = d_udp;
+    dropdown_logging.panel = d_logging;
 
     PANEL e_name = {
         .type = PANEL_EDIT,
@@ -659,6 +711,22 @@ void ui_scale(uint8_t scale)
         .y = SEARCH_Y,
         .height = 12 * SCALE,
         .width = LIST_RIGHT - SCALE * 25,
+    },
+
+    e_proxy_ip = {
+        .type = PANEL_EDIT,
+        .x = 70 * SCALE,
+        .y = SCALE * 288,
+        .height = SCALE * 12,
+        .width = SCALE * 60
+    },
+
+    e_proxy_port = {
+        .type = PANEL_EDIT,
+        .x = 135 * SCALE,
+        .y = SCALE * 288,
+        .height = SCALE * 12,
+        .width = SCALE * 30
     };
 
     edit_name.panel = e_name;
@@ -668,6 +736,8 @@ void ui_scale(uint8_t scale)
     edit_addmsg.panel = e_addmsg;
     edit_msg.panel = e_msg;
     edit_search.panel = e_search;
+    edit_proxy_ip.panel = e_proxy_ip;
+    edit_proxy_port.panel = e_proxy_port;
 
     setscale();
 }
