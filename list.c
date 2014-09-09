@@ -43,8 +43,9 @@ static void drawitem(ITEM *i, int x, int y)
     case ITEM_FRIEND: {
         FRIEND *f = i->data;
 
-        drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
-
+        if(avatars_visable){
+            drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
+        }
         drawname(i, y, f->name, f->status_message, f->name_length, f->status_length);
 
         uint8_t status = f->online ? f->status : 3;
@@ -57,7 +58,9 @@ static void drawitem(ITEM *i, int x, int y)
 
     case ITEM_GROUP: {
         GROUPCHAT *g = i->data;
-        drawalpha(BM_GROUP, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
+        if(avatars_visable){
+            drawalpha(BM_GROUP, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
+        }
         drawname(i, y, g->name, g->topic, g->name_length, g->topic_length);
         break;
     }
@@ -67,8 +70,9 @@ static void drawitem(ITEM *i, int x, int y)
 
         uint8_t name[TOX_FRIEND_ADDRESS_SIZE * 2];
         id_to_string(name, f->id);
-
-        drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
+        if(avatars_visable){
+            drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
+        }
         drawname(i, y, name, f->msg, sizeof(name), f->length);
         break;
     }
