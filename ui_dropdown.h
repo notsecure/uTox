@@ -83,6 +83,11 @@ static void dropdown_logging_onselect(void *handle)
     logging_enabled = (handle != 0);
 }
 
+static void dropdown_avatars_onselect(void *handle)
+{
+    avatars_visable = (handle != 0);
+}
+
 static DROP_ELEMENT dpidrops[] = {
     {
         .name = (uint8_t*)"Tiny (50%)",
@@ -278,6 +283,12 @@ dropdown_udp = {
 
 dropdown_logging = {
     .onselect = dropdown_logging_onselect,
+    .dropcount = countof(noyesdrops),
+    .drop = noyesdrops
+},
+
+dropdown_avatars = {
+    .onselect = dropdown_avatars_onselect,
     .dropcount = countof(noyesdrops),
     .drop = noyesdrops
 };

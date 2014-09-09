@@ -58,8 +58,9 @@ STRING strings[][64] = {
     STR("Proxy (SOCKS 5)"),
     STR("Das Verändern von Netzwerk/Proxy-Einstellungen unterbricht die Verbindung zum Tox-Netzwerk."),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Kopieren"),
     STR("Kopieren (ohne Namen)"),
     STR("Ausschneiden"),
@@ -71,7 +72,7 @@ STRING strings[][64] = {
     STR("Akzeptieren"),
     STR("Ignorieren"),
 
-    //50
+    //51
     STR("Zum speichern klicken"),
     STR("Zum öffnen klicken"),
     STR("Abgebrochen"),
@@ -134,8 +135,9 @@ STRING strings[][64] = {
     STR("Proxy (SOCKS 5)"),
     STR("Changing Network/Proxy settings will disconnect you from the Tox network"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Copy"),
     STR("Copy (no names)"),
     STR("Cut"),
@@ -147,7 +149,7 @@ STRING strings[][64] = {
     STR("Accept"),
     STR("Ignore"),
 
-    //50
+    //51
     STR("Click to save"),
     STR("Click to open"),
     STR("Cancelled"),
@@ -210,8 +212,9 @@ STRING strings[][64] = {
     STR("Proxy (SOCKS 5)"),
     STR("Changing Network/Proxy settings will disconnect you from the Tox network"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Copy"),
     STR("Copy (no names)"),
     STR("Cut"),
@@ -223,7 +226,7 @@ STRING strings[][64] = {
     STR("Accept"),
     STR("Ignore"),
 
-    //50
+    //51
     STR("Click to save"),
     STR("Click to open"),
     STR("Cancelled"),
@@ -286,8 +289,9 @@ STRING strings[][64] = {
     STR("Proxy (SOCKS 5)"),
     STR("Modifier les paramètres Réseau/Proxy vous déconnectera du réseau Tox"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Copier"),
     STR("Copier (sans les noms)"),
     STR("Couper"),
@@ -299,7 +303,7 @@ STRING strings[][64] = {
     STR("Accepter"),
     STR("Ignorer"),
 
-    //50
+    //51
     STR("Cliquer pour sauvegarder"),
     STR("Cliquer pour ouvrir"),
     STR("Annulé"),
@@ -362,8 +366,9 @@ STRING strings[][64] = {
     STR("Proxy (SOCKS 5)"),
     STR("Cambiando le impostazioni del Network o del Proxy, verrai disconnesso dalla rete Tox"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Copia"),
     STR("Copia (nessun nome)"),
     STR("Taglia"),
@@ -375,7 +380,7 @@ STRING strings[][64] = {
     STR("Accetta"),
     STR("Ignora"),
 
-    //50
+    //51
     STR("Clicca per salvare"),
     STR("Clicca per aprire"),
     STR("Annullato"),
@@ -438,8 +443,9 @@ STRING strings[][64] = {
     STR("プロキシ (SOCKS 5)"),
     STR("ネットワークやプロキシの設定を変えるとToxネットワークの接続が切断されます"),
     STR("ロギング"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("コピー"),
     STR("コピー（名前以外）"),
     STR("カット"),
@@ -451,7 +457,7 @@ STRING strings[][64] = {
     STR("承認"),
     STR("無視する"),
 
-    //50
+    //51
     STR("クリックで保存"),
     STR("クリックで開く"),
     STR("キャンセルしました"),
@@ -514,8 +520,9 @@ STRING strings[][64] = {
     STR("Starpniekserveris (SOCKS 5)"),
     STR("Changing Network/Proxy settings will disconnect you from the Tox network"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Kopēt"),
     STR("Kopēt (no names)"),
     STR("Izgriezt"),
@@ -527,7 +534,7 @@ STRING strings[][64] = {
     STR("Accept"),
     STR("Ignorēt"),
 
-    //50
+    //51
     STR("Spiest, lai saglabātu"),
     STR("Spiest, lai atvērtu"),
     STR("Atcelts"),
@@ -590,8 +597,9 @@ STRING strings[][64] = {
     STR("Proxy (SOCKS 5)"),
     STR("Veranderen van Netwerk/Proxy instelling zal de verbinding met het Tox netwerk verbreken"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Kopiëren"),
     STR("Kopieër (zonder namen)"),
     STR("Knippen"),
@@ -603,7 +611,7 @@ STRING strings[][64] = {
     STR("Accepteren"),
     STR("Negeren"),
 
-    //50
+    //51
     STR("Klik om op te slaan"),
     STR("Klik om te openen"),
     STR("Geannuleerd"),
@@ -666,8 +674,9 @@ STRING strings[][64] = {
     STR("Proxy (SOCKS 5)"),
     STR("Zmiana ustawień sieci/proxy rozłączy cię z siecią Tox"),
     STR("Historia"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Kopiuj"),
     STR("Kopiuj (bez nicków)"),
     STR("Wytnij"),
@@ -679,7 +688,7 @@ STRING strings[][64] = {
     STR("Zaakceptuj"),
     STR("Ignoruj"),
 
-    //50
+    //51
     STR("Przyciśnij by zapisać"),
     STR("Przyciśnij by otworzyć"),
     STR("Anulowano"),
@@ -742,8 +751,9 @@ STRING strings[][64] = {
     STR("Прокси (SOCKS 5)"),
     STR("Изменение настроек сети или прокси-сервера требует отключения от сети Tox"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Копировать"),
     STR("Копировать (без имени)"),
     STR("Вырезать"),
@@ -755,7 +765,7 @@ STRING strings[][64] = {
     STR("Принять"),
     STR("Игнорировать"),
 
-    //50
+    //51
     STR("Сохранить"),
     STR("Открыть"),
     STR("Отменено"),
@@ -818,8 +828,9 @@ STRING strings[][64] = {
     STR("Проксі (SOCKS 5)"),
     STR("Зміна налаштувань мережі або проксі-сервера потребує від'єднання від мережі Tox"),
     STR("Logging"),
+    STR("Avatars"),
 
-    //41
+    //42
     STR("Копіювати"),
     STR("Копіювати (без імені)"),
     STR("Вирізати"),
@@ -831,7 +842,7 @@ STRING strings[][64] = {
     STR("Прийняти"),
     STR("Ігнорувати"),
 
-    //50
+    //51
     STR("Натисніть для збереження"),
     STR("Натисніть для відкриття"),
     STR("Скасовано"),
@@ -893,8 +904,9 @@ STRING strings[][64] = {
     STR("UDP:"),
     STR("代理 (SOCKS 5)"),
     STR("修改网络或代理设置将会断开tox网络连接"),
-
-    //41
+    STR("Avatars"),
+    
+    //42
     STR("复制"),
     STR("复制 (不带名字)"),
     STR("剪切"),
@@ -906,7 +918,7 @@ STRING strings[][64] = {
     STR("接受"),
     STR("忽略"),
 
-    //50
+    //51
     STR("点击保存"),
     STR("点击打开"),
     STR("取消"),

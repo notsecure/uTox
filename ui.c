@@ -152,6 +152,8 @@ static void drawsettings_content(int x, int y, int w, int height)
 
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 310, LOGGING);
 
+    drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 334, AVATAR);
+
     drawtext(LIST_RIGHT + SCALE * 132, y + SCALE * 290, (uint8_t*)":", 1);
 
     setfont(FONT_SELF_NAME);
@@ -280,6 +282,7 @@ panel_settings = {
         (void*)&dropdown_audio_in, (void*)&dropdown_audio_out, (void*)&dropdown_video,
         (void*)&dropdown_dpi, (void*)&dropdown_language, (void*)&dropdown_proxy,
         (void*)&dropdown_ipv6, (void*)&dropdown_udp, (void*)&dropdown_logging,
+        (void*)&dropdown_avatars,
         NULL
     }
 },
@@ -644,6 +647,14 @@ void ui_scale(uint8_t scale)
         .y = SCALE * 320,
         .height = SCALE * 12,
         .width = SCALE * 20
+    },
+
+    d_avatars = {
+        .type = PANEL_DROPDOWN,
+        .x = 5 * SCALE,
+        .y = SCALE * 344,
+        .height = SCALE * 12,
+        .width = SCALE * 20
     };
 
     dropdown_audio_in.panel = d_audio_in;
@@ -656,6 +667,7 @@ void ui_scale(uint8_t scale)
     dropdown_ipv6.panel = d_ipv6;
     dropdown_udp.panel = d_udp;
     dropdown_logging.panel = d_logging;
+    dropdown_avatars.panel = d_avatars;
 
     PANEL e_name = {
         .type = PANEL_EDIT,
