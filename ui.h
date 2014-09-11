@@ -190,10 +190,10 @@ uint8_t SCALE;
 #define LIST_Y2 (43 * SCALE)
 #define LIST_BOTTOM (-18 * SCALE)
 
-#define LIST_NAME_X (37 * SCALE * avatars_visable + !(avatars_visable) * LIST_AVATAR_X)
+#define LIST_NAME_X (37 * SCALE * !(avatars_hidden) + avatars_hidden * LIST_AVATAR_X)
 #define LIST_NAME_Y (6 * SCALE)
 
-#define LIST_STATUS_X (37 * SCALE * avatars_visable + !(avatars_visable) * LIST_AVATAR_X)
+#define LIST_STATUS_X (37 * SCALE * !(avatars_hidden) + avatars_hidden * LIST_AVATAR_X)
 #define LIST_STATUS_Y (13 * SCALE)
 
 #define LIST_AVATAR_X (LIST_X + 5 * SCALE / 2)
