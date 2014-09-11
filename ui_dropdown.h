@@ -85,7 +85,7 @@ static void dropdown_logging_onselect(void *handle)
 
 static void dropdown_avatars_onselect(void *handle)
 {
-    avatars_visable = (handle != 0);
+    avatars_hidden = (handle != 0);
 }
 
 static DROP_ELEMENT dpidrops[] = {

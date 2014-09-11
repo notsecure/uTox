@@ -32,7 +32,7 @@ typedef struct
     uint8_t version, scale, enableipv6, disableudp;
     uint16_t window_x, window_y, window_width, window_height;
     uint16_t proxy_port;
-    uint8_t proxyenable, logging_enabled, avatars_visable;
+    uint8_t proxyenable, logging_enabled, avatars_hidden;
     uint8_t proxy_ip[0];
 }UTOX_SAVE;
 
@@ -110,7 +110,7 @@ _Bool tox_connected;
 _Bool audio_preview, video_preview;
 
 volatile _Bool logging_enabled;
-volatile _Bool avatars_visable;
+volatile _Bool avatars_hidden;
 
 //friends and groups
 //note: assumes array size will always be large enough
