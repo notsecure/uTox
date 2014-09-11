@@ -205,10 +205,10 @@ uint8_t SCALE;
 
 #define SCROLL_WIDTH (4 * SCALE) //must be divisible by 2
 
-#define SELF_NAME_X (32 * SCALE)
+#define SELF_NAME_X (32 * SCALE * !(avatars_hidden) + avatars_hidden * SELF_AVATAR_X)
 #define SELF_NAME_Y (8 * SCALE)
 
-#define SELF_MSG_X (32 * SCALE)
+#define SELF_MSG_X (32 * SCALE * !(avatars_hidden) + avatars_hidden * SELF_AVATAR_X)
 #define SELF_MSG_Y (15 * SCALE)
 
 #define SELF_AVATAR_X (5 * SCALE)
