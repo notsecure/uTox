@@ -1154,8 +1154,16 @@ static void call_notify(FRIEND *f, uint8_t status)
     {
          //PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
          playringtone();
-
     }
+     if(status == 4)
+    {
+         //PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
+	 stopringtone();
+    }
+
+
+
+
     friend_notify(f, str->str, str->length, (uint8_t*)"", 0);
     friend_addmessage_notify(f, str->str, str->length);
 }

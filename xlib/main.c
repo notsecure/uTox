@@ -1266,3 +1266,8 @@ void playringtone()
 {
 
 }
+
+void stopringtone()
+{
+	
+}

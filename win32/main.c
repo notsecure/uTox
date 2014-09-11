@@ -2133,3 +2133,8 @@ void playringtone()
 {
     PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
 }
+
+void stopringtone()
+{
+	PlaySound(NULL, 0, SND_ASYNC);
+}
