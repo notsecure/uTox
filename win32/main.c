@@ -91,6 +91,8 @@ enum
     TRAY_STATUS_BUSY,
 };
 
+
+
 static int utf8tonative(char_t *str, wchar_t *out, int length)
 {
     return MultiByteToWideChar(CP_UTF8, 0, (char*)str, length, out, length);
@@ -2125,4 +2127,9 @@ _Bool video_endread(void)
         return 0;
     }
     return 1;
+}
+
+void playringtone()
+{
+    PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
 }

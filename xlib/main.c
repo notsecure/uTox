@@ -1261,3 +1261,8 @@ int video_getframe(vpx_image_t *image)
 
     return v4l_getframe(image);
 }
+
+void playringtone()
+{
+
+}
