@@ -1,4 +1,6 @@
 #include "main.h"
+#include "main.h"
+#include "main.h"
 #include "tox_bootstrap.h"
 
 typedef struct {
@@ -1155,7 +1157,7 @@ static void call_notify(FRIEND *f, uint8_t status)
          //PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
          playringtone();
     }
-     if(status == 4)
+     if(status == 3)
     {
          //PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
 	 stopringtone();

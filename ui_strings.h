@@ -104,7 +104,7 @@ STRING strings[][64] = {
 
     //19
     STR("Call cancelled"),
-    STR("Call invited"),
+    STR("Incoming call"),
     STR("Call ringing"),
     STR("Call started"),
 
