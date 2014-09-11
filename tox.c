@@ -1152,7 +1152,7 @@ static void call_notify(FRIEND *f, uint8_t status)
     STRING *str = &strings[LANG][CALL_STRING_1 + (status & 3)];
      if(status == 1)
     {
-         PlaySound(TEXT("r.wav"), NULL, SND_FILENAME | SND_ASYNC);
+         PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
     }
     friend_notify(f, str->str, str->length, (uint8_t*)"", 0);
     friend_addmessage_notify(f, str->str, str->length);
