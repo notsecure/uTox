@@ -4,7 +4,7 @@ STRING strings[][64] = {
 //Deutsch  GERMAN
 {
     //0
-    STR("Freundschaftsanfrage verschickt. Dein Freund wird online erscheinen, wenn er deine Anfrage akzeptiert."),
+    STR("Freundschaftsanfrage verschickt. Dein Freund wird online erscheinen, wenn er/sie deine Anfrage akzeptiert."),
     STR("Versuche DNS Namen aufzulösen..."),
     STR("Fehler: Ungültige Tox ID"),
     STR("Fehler: Keine Tox ID angegeben"),
@@ -80,7 +80,7 @@ STRING strings[][64] = {
 //English  ENGLISH
 {
     //0
-    STR("Friend request sent. Your friend will appear online when he accepts the request."),
+    STR("Friend request sent. Your friend will appear online after accepting it."),
     STR("Attempting to resolve DNS name..."),
     STR("Error: Invalid Tox ID"),
     STR("Error: No Tox ID specified"),
@@ -156,7 +156,7 @@ STRING strings[][64] = {
 //Spanish SPANISH
 {
     //0
-    STR("Friend request sent. Your friend will appear online when he accepts the request."),
+    STR("Friend request sent. Your friend will appear online after accepting it."),
     STR("Attempting to resolve DNS name..."),
     STR("Error: Invalid Tox ID"),
     STR("Error: No Tox ID specified"),
