@@ -80,7 +80,7 @@ STRING strings[][64] = {
 //English  ENGLISH
 {
     //0
-    STR("Friend request sent. Your friend will appear online when he accepts the request."),
+    STR("Friend request sent. Your friend will appear online after accepting the request."),
     STR("Attempting to resolve DNS name..."),
     STR("Error: Invalid Tox ID"),
     STR("Error: No Tox ID specified"),
@@ -156,7 +156,7 @@ STRING strings[][64] = {
 //Spanish SPANISH
 {
     //0
-    STR("Friend request sent. Your friend will appear online when he accepts the request."),
+    STR("Friend request sent. Your friend will appear online after accepting the request."),
     STR("Attempting to resolve DNS name..."),
     STR("Error: Invalid Tox ID"),
     STR("Error: No Tox ID specified"),
@@ -460,7 +460,7 @@ STRING strings[][64] = {
 //Latviešu  LATVIAN
 {
     //0
-    STR("Friend request sent. Your friend will appear online when they accept the request."),
+    STR("Friend request sent. Your friend will appear online after accepting the request."),
     STR("Attempting to resolve DNS name..."),
     STR("Kļūda: Nederīgs Tox ID"),
     STR("Kļūda: No Tox ID specified"),
