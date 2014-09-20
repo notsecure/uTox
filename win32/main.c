@@ -2139,7 +2139,8 @@ _Bool video_endread(void)
 
 void playringtone()
 {
-    PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
+    //PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
+    toxaudio_postmessage(AUDIO_PLAY_RINGTONE, 0, 0, NULL);
 }
 
 void stopringtone()

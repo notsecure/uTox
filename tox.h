@@ -49,6 +49,7 @@ enum
     AUDIO_PREVIEW_END,
     AUDIO_CALL_START,
     AUDIO_CALL_END,
+    AUDIO_PLAY_RINGTONE,
 };
 
 enum

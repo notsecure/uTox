@@ -50,7 +50,8 @@ static void callback_av_start(void *arg, int32_t call_index, void *userdata)
 
 static void callback_av_cancel(void *arg, int32_t call_index, void *userdata)
 {
-    stopcall();    
+    stopcall();
+
     debug("A/V Cancel (%i)\n", call_index);
 }
 
@@ -551,6 +552,151 @@ static void audio_thread(void *args)
                 break;
             }
 
+            case AUDIO_PLAY_RINGTONE: {
+
+
+                ALCdevice *dev = NULL;
+                ALCcontext *ctx = NULL;
+
+                const char *defname = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
+
+                /* Create buffer to store samples */
+                ALuint buf2;
+                alGenBuffers(1, &buf2);
+                //al_check_error();
+
+                /* Fill buffer with Sine-Wave */
+                float freq = 440.f;
+                int seconds = 4;
+                unsigned sample_rate = 22050;
+                size_t buf_size = seconds * sample_rate;
+
+                short *samples;
+                // samples = new short[buf_size];
+                samples = (short*)malloc(buf_size*sizeof(short));
+                int ii;
+                for( ii=0; ii<buf_size; ++ii) {
+                    samples[ii] = 32760 * sin( (2.0*3.1415*freq)/sample_rate * ii );
+                }
+
+                /* Download buffer to OpenAL */
+
+
+                alBufferData(buf2, AL_FORMAT_MONO16, samples, buf_size, sample_rate);
+
+                debug("Lets read a wave and play it. RINGTONE!\n");
+                FILE *fp = NULL;                                                            //Create FILE pointer for the WAVE file
+                fp=fopen("ring.wav","rb");                                            //Open the WAVE file
+                if (!fp) {
+                    //  return endWithError("Failed to open file");                        //Could not open file
+                    debug("Failed to open file\n");
+                    break;
+                }
+
+                //Variables to store info about the WAVE file (all of them is not needed for OpenAL)
+                char type[4];
+                DWORD size,chunkSize;
+                short formatType,channels;
+                DWORD sampleRate,avgBytesPerSec;
+                short bytesPerSample,bitsPerSample;
+                DWORD dataSize;
+
+                //Check that the WAVE file is OK
+                fread(type,sizeof(char),4,fp);                                              //Reads the first bytes in the file
+                if(type[0]!='R' || type[1]!='I' || type[2]!='F' || type[3]!='F')            //Should be "RIFF"
+                    debug("No RIFF");
+                else
+                    debug("RIFF is Good\n");
+                fread(&size, sizeof(DWORD),1,fp);                                           //Continue to read the file
+                fread(type, sizeof(char),4,fp);                                             //Continue to read the file
+                if (type[0]!='W' || type[1]!='A' || type[2]!='V' || type[3]!='E')           //This part should be "WAVE"
+                    // return endWithError("not WAVE");                                            //Not WAVE
+                    debug("not WAVE\n");
+
+                fread(type,sizeof(char),4,fp);                                              //Continue to read the file
+                if (type[0]!='f' || type[1]!='m' || type[2]!='t' || type[3]!=' ')           //This part should be "fmt "
+                    debug("not fmt\n");
+
+                //Now we know that the file is a acceptable WAVE file
+                //Info about the WAVE data is now read and stored
+                fread(&chunkSize,sizeof(DWORD),1,fp);
+                fread(&formatType,sizeof(short),1,fp);
+                fread(&channels,sizeof(short),1,fp);
+                fread(&sampleRate,sizeof(DWORD),1,fp);
+                fread(&avgBytesPerSec,sizeof(DWORD),1,fp);
+                fread(&bytesPerSample,sizeof(short),1,fp);
+                fread(&bitsPerSample,sizeof(short),1,fp);
+
+                fread(type,sizeof(char),4,fp);
+                if (type[0]!='d' || type[1]!='a' || type[2]!='t' || type[3]!='a')           //This part should be "data"
+                    debug("Missing DATA\n");
+
+                fread(&dataSize,sizeof(DWORD),1,fp);                                        //The size of the sound data is read
+
+
+                samples= (unsigned char*)malloc(dataSize);                           //Allocate memory for the sound data
+                fread(samples,sizeof(BYTE),dataSize,fp);                                                                          //number of bytes loaded.
+                //Should be the same as the Data Size if OK
+                ALuint mysource;                                                              //Is the name of source (where the sound come from)
+                ALuint mybuffer;                                                           //Stores the sound data
+                ALuint frequency=sampleRate;                                               //The Sample Rate of the WAVE file
+                ALenum format=0;
+                printf("samerate is %d\n",sampleRate);                                                            //The audio format (bits per sample, number of channels)
+
+                alGenBuffers(1, &mybuffer);                                                    //Generate one OpenAL Buffer and link to "buffer"
+                alGenSources(1, &mysource);                                                   //Generate one OpenAL Source and link to "source"
+                if(alGetError() != AL_NO_ERROR)
+                    debug("Error GenSource");
+                //    return endWithError("Error GenSource");     //Error during buffer/source generation
+
+                //Figure out the format of the WAVE file
+                if(bitsPerSample == 8) {
+                    if(channels == 1)
+                        format = AL_FORMAT_MONO8;
+                    else if(channels == 2)
+                        format = AL_FORMAT_STEREO8;
+                } else if(bitsPerSample == 16) {
+                    if(channels == 1)
+                        format = AL_FORMAT_MONO16;
+                    else if(channels == 2)
+                        format = AL_FORMAT_STEREO16;
+                }
+                if(!format)
+                    debug("Wrong BitPerSample\n");
+                //    return endWithError("Wrong BitPerSample");                      //Not valid format
+
+                ALfloat SourcePos[] = { 0.0, 0.0, 0.0 };                                    //Position of the source sound
+                ALfloat SourceVel[] = { 0.0, 0.0, 0.0 };                                    //Velocity of the source sound
+                ALfloat ListenerPos[] = { 0.0, 0.0, 0.0 };                                  //Position of the listener
+                ALfloat ListenerVel[] = { 0.0, 0.0, 0.0 };                                  //Velocity of the listener
+                ALfloat ListenerOri[] = { 0.0, 0.0, -1.0,  0.0, 1.0, 0.0 };                 //Orientation of the listener
+                //First direction vector, then vector pointing up)
+                //Listener
+                //  alListenerfv(AL_POSITION,    ListenerPos);                                  //Set position of the listener
+                //  alListenerfv(AL_VELOCITY,    ListenerVel);                                  //Set velocity of the listener
+                //  alListenerfv(AL_ORIENTATION, ListenerOri);                                  //Set orientation of the listener
+
+                //Source
+                // alSourcei (mysource, AL_BUFFER,   mybuffer);                                 //Link the buffer to the source
+                // alSourcef (mysource, AL_PITCH,    1.0f     );                                 //Set the pitch of the source
+                // alSourcef (mysource, AL_GAIN,     1.0f     );                                 //Set the gain of the source
+                // alSourcefv(mysource, AL_POSITION, SourcePos);                                 //Set the position of the source
+                // alSourcefv(mysource, AL_VELOCITY, SourceVel);                                 //Set the velocity of the source
+                // alSourcei (mysource, AL_LOOPING,  AL_FALSE );                                 //Set if source is looping sound
+
+                //PLAY
+                alBufferData(buf2, format, samples, dataSize, frequency);
+                /* Set-up sound source and play buffer */
+                ALuint src = 0;
+                alGenSources(1, &src);
+                alSourcei(src, AL_BUFFER, buf2);
+                alSourcePlay(src);
+                free(samples);
+                debug("ring\n");
+
+                break;
+            }
+
             }
 
             audio_thread_msg = 0;
@@ -640,7 +786,8 @@ static void audio_thread(void *args)
 void toxaudio_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
 {
     switch(msg) {
-    case AUDIO_SET_INPUT: {;
+    case AUDIO_SET_INPUT: {
+        ;
         break;
     }
 
