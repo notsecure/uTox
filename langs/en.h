@@ -65,7 +65,7 @@ msgid(CALL_CANCELLED)
 msgstr("Call cancelled")
 
 msgid(CALL_INVITED)
-msgstr("Call invited")
+msgstr("Incomming call")
 
 msgid(CALL_RINGING)
 msgstr("Call ringing")
