@@ -1,6 +1,4 @@
 #include "main.h"
-#include "main.h"
-#include "main.h"
 #include "tox_bootstrap.h"
 
 typedef struct {
@@ -451,9 +449,13 @@ static void callback_file_data(Tox *tox, int32_t fid, uint8_t filenumber, const 
 /* bootstrap to dht with bootstrap_nodes */
 static void do_bootstrap(Tox *tox)
 {
-    static int j = 0;
+    static unsigned int j = 0;
+
+    if (j == 0)
+        j = rand();
+
     int i = 0;
-    while(i < 2) {
+    while(i < 4) {
         struct bootstrap_node *d = &bootstrap_nodes[j % countof(bootstrap_nodes)];
         tox_bootstrap_from_address(tox, d->address, d->port, d->key);
         i++;
@@ -825,7 +827,31 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint8_t msg, uint16_t param1
             r = tox_add_friend(tox, data, data + TOX_FRIEND_ADDRESS_SIZE, param1);
         }
 
-        postmessage(FRIEND_ADD, (r < 0), (r < 0) ? ~r : r, data);
+        if(r < 0) {
+            uint8_t addf_error;
+            switch(r) {
+            case TOX_FAERR_TOOLONG:
+                addf_error = ADDF_TOOLONG; break;
+            case TOX_FAERR_NOMESSAGE:
+                addf_error = ADDF_NOMESSAGE; break;
+            case TOX_FAERR_OWNKEY:
+                addf_error = ADDF_OWNKEY; break;
+            case TOX_FAERR_ALREADYSENT:
+                addf_error = ADDF_ALREADYSENT; break;
+            case TOX_FAERR_BADCHECKSUM:
+                addf_error = ADDF_BADCHECKSUM; break;
+            case TOX_FAERR_SETNEWNOSPAM:
+                addf_error = ADDF_SETNEWNOSPAM; break;
+            case TOX_FAERR_NOMEM:
+                addf_error = ADDF_NOMEM; break;
+            case TOX_FAERR_UNKNOWN:
+            default:
+                addf_error = ADDF_UNKNOWN; break;
+            }
+            postmessage(FRIEND_ADD, 1, addf_error, data);
+        } else {
+            postmessage(FRIEND_ADD, 0, r, data);
+        }
         break;
     }
 
@@ -1145,26 +1171,47 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint8_t msg, uint16_t param1
 
 static void file_notify(FRIEND *f, MSG_FILE *msg)
 {
-    STRING *str = &strings[LANG][FILE_STRING_1 + msg->status];
+    STRING *str;
+
+    switch(msg->status) {
+    case FILE_PENDING:
+        str = SPTR(TRANSFER_NEW); break;
+    case FILE_OK:
+        str = SPTR(TRANSFER_STARTED); break;
+    case FILE_PAUSED:
+        str = SPTR(TRANSFER___); break;
+    case FILE_PAUSED_OTHER:
+        str = SPTR(TRANSFER_PAUSED); break;
+    case FILE_KILLED:
+        str = SPTR(TRANSFER_CANCELLED); break;
+    case FILE_DONE:
+        str = SPTR(TRANSFER_COMPLETE); break;
+    case FILE_BROKEN:
+    default: //render unknown status as "transfer broken"
+        str = SPTR(TRANSFER_BROKEN); break;
+    }
+
     friend_notify(f, str->str, str->length, msg->name, msg->name_length);
 }
 
 static void call_notify(FRIEND *f, uint8_t status)
 {
-    STRING *str = &strings[LANG][CALL_STRING_1 + (status & 3)];
-     if(status == 1)
-    {
-         //PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
-         playringtone();
+    STRING *str;
+
+    switch(status) {
+    case CALL_INVITED:
+    case CALL_INVITED_VIDEO:
+        str = SPTR(CALL_INVITED); break;
+    case CALL_RINGING:
+    case CALL_RINGING_VIDEO:
+        str = SPTR(CALL_RINGING); break;
+    case CALL_OK:
+    case CALL_OK_VIDEO:
+        str = SPTR(CALL_STARTED); break;
+    case CALL_NONE:
+    default: //render unknown status as "call cancelled"
+        str = SPTR(CALL_CANCELLED); break;
     }
-     if(status == 3)
-    {
-         //PlaySound(TEXT("ring.wav"), NULL, SND_FILENAME | SND_ASYNC);
-	 stopringtone();
-    }
-
-
-
 
     friend_notify(f, str->str, str->length, (uint8_t*)"", 0);
     friend_addmessage_notify(f, str->str, str->length);
@@ -1233,7 +1280,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
         /* confirmation that friend has been added to friend list (add) */
         if(param1) {
             /* friend was not added */
-            addfriend_status = param2 + ADDF_TOOLONG;
+            addfriend_status = param2;
         } else {
             /* friend was added */
             edit_addid.length = 0;
@@ -1317,7 +1364,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
 
     case FRIEND_TYPING: {
         FRIEND *f = &friend[param1];
-        f->typing = param2;
+        friend_set_typing(f, param2);
         updatefriend(f);
         break;
     }
@@ -1325,6 +1372,9 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
     case FRIEND_ONLINE: {
         FRIEND *f = &friend[param1];
         f->online = param2;
+        if(!f->online) {
+            friend_set_typing(f, 0);
+        }
         updatefriend(f);
         break;
     }
@@ -1630,7 +1680,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
 
     case GROUP_ADD: {
         GROUPCHAT *g = &group[param1];
-        g->name_length = sprintf((char*)g->name, "Groupchat #%u", param1);
+        g->name_length = snprintf((char*)g->name, sizeof(g->name), "Groupchat #%u", param1);
         g->topic_length = sizeof("Drag friends to invite them") - 1;
         memcpy(g->topic, "Drag friends to invite them", sizeof("Drag friends to invite them") - 1);
         g->msg.scroll = 1.0;
@@ -1660,7 +1710,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
             g->peers--;
         }
 
-        g->topic_length = sprintf((char*)g->topic, "%u users in chat", g->peers);
+        g->topic_length = snprintf((char*)g->topic, sizeof(g->topic), "%u users in chat", g->peers);
 
         updategroup(g);
 
@@ -1686,7 +1736,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
 
         g->peername[param2] = data;
 
-        g->topic_length = sprintf((char*)g->topic, "%u users in chat", g->peers);
+        g->topic_length = snprintf((char*)g->topic, sizeof(g->topic), "%u users in chat", g->peers);
 
         updategroup(g);
 

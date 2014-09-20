@@ -316,7 +316,7 @@ void audio_end(int32_t call_index);
 void playringtone();
 void stopringtone();
 
-#define drawstr(x, y, i) drawtext(x, y, strings[LANG][STR_##i].str, strings[LANG][STR_##i].length)
+#define drawstr(x, y, i) drawtext(x, y, S(i), SLEN(i))
 #define drawstr_getwidth(x, y, str) drawtext_getwidth(x, y, (uint8_t*)str, sizeof(str) - 1)
 #define strwidth(x) textwidth((uint8_t*)x, sizeof(x) - 1)
 

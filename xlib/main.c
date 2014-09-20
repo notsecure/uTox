@@ -775,7 +775,7 @@ static int systemlang(void)
         return LANG_TW;
     }
 
-    return LANG_EN;
+    return DEFAULT_LANG;
 }
 
 int main(int argc, char *argv[])
@@ -1130,7 +1130,7 @@ void* video_detect(void)
     #else
     int i;
     for(i = 0; i != 64; i++) {
-        sprintf(dev_name + 10, "%i", i);
+        snprintf(dev_name + 10, sizeof(dev_name) - 10, "%i", i);
 
         struct stat st;
         if (-1 == stat(dev_name, &st)) {

@@ -1,5 +1,22 @@
 #include "main.h"
 
+// Ideally this function would have returned an array of simultaneously
+// typing friends, e.g. in a groupchat. But since groupchats don't support
+// notifications, it simply returns the friend associated with
+// given MESSAGES, or NULL if he is not typing.
+static FRIEND* get_typers(MESSAGES *m) {
+    // Currently only friends support typing notifications
+    if(sitem->item == ITEM_FRIEND) {
+        FRIEND *f = sitem->data;
+        // check just in case that we're given the messages panel for
+        // the currently selected friend
+        if(&f->msg == m->data) {
+            if(f->typing) return f;
+        }
+    }
+    return NULL;
+}
+
 void messages_draw(MESSAGES *m, int x, int y, int width, int height)
 {
     setcolor(0);
@@ -30,7 +47,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
         setfont(FONT_MISC);
         char timestr[6];
         int len;
-        len = sprintf(timestr, "%u:%.2u", msg->time / 60, msg->time % 60);
+        len = snprintf(timestr, sizeof(timestr), "%u:%.2u", msg->time / 60, msg->time % 60);
         drawtext(x + width - TIME_WIDTH, y, (uint8_t*)timestr, len);
 
         if(m->type) {
@@ -112,7 +129,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             _Bool mo = (m->iover == i);
 
             uint8_t size[16];
-            int sizelen = sprint_bytes(size, file->size);
+            int sizelen = sprint_bytes(size, sizeof(size), file->size);
 
             setcolor(WHITE);
             setfont(FONT_MISC);
@@ -163,7 +180,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
                     uint8_t text[16];
                     int len;
 
-                    len = sprint_bytes(text, file->speed);
+                    len = sprint_bytes(text, sizeof(text), file->speed);
                     text[len++] = '/';
                     text[len++] = 's';
 
@@ -174,7 +191,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
                         etasec = (file->size - progress) / file->speed;
                     }
 
-                    len = sprintf((char*)text, "%us", (uint32_t)etasec);
+                    len = snprintf((char*)text, sizeof(text), "%us", (uint32_t)etasec);
 
                     drawtext(xx + 5 * SCALE + 106 * SCALE - textwidth(text, len), y + 10 * SCALE, text, len);
                 }
@@ -191,6 +208,17 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
         }
 
         y += MESSAGES_SPACING;
+    }
+
+    if(i == n) {
+        // Last message is visible. Append typing notifications, if needed.
+        FRIEND *f = get_typers(m);
+        if(f) {
+            setfont(FONT_TEXT);
+            setcolor(C_GRAY2);
+            drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, f->name, f->name_length);
+            drawtextwidth(x + MESSAGES_X, x + width, y, S(IS_TYPING), SLEN(IS_TYPING));
+        }
     }
 }
 
@@ -765,6 +793,10 @@ void messages_updateheight(MESSAGES *m)
         height += msg->height;
         i++;
     }
+    if(get_typers(m)) {
+        // Add space for typing notification
+        height += font_small_lineheight + MESSAGES_SPACING;
+    }
 
     m->height = height;
     data->height = height;
@@ -835,6 +867,14 @@ void message_add(MESSAGES *m, MESSAGE *msg, MSG_DATA *p)
     }
 
     message_setheight(m, msg, p);
+}
+
+void messages_set_typing(MESSAGES *m, MSG_DATA *p, int typing) {
+    if(m->data == p) {
+        // MSG_DATA associated with typing notification
+        // corresponds to given MESSAGES, so update their height.
+        messages_updateheight(m);
+    }
 }
 
 _Bool messages_char(uint32_t ch)
