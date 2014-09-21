@@ -165,7 +165,7 @@ int sprint_bytes(uint8_t *dest, unsigned int size, uint64_t bytes)
     char *str[] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"};
     int i = 0;
     double f = bytes;
-    while(bytes >= 1024) {
+    while((bytes >= 1024) && (i < 8)) {
         bytes /= 1024;
         f /= 1024.0;
         i++;
