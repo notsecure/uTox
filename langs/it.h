@@ -47,8 +47,9 @@ msgid(TRANSFER_STARTED)
 msgstr("Trasferimento file iniziato")
 
 //TODO: Same as in English? Localize or remove.
-//msgid(TRANSFER___)
-//msgstr("...")
+//Keeping it for the moment.
+msgid(TRANSFER___)
+msgstr("...")
 
 msgid(TRANSFER_PAUSED)
 msgstr("Trasferimento file in pausa")
@@ -78,8 +79,9 @@ msgid(ADDFRIENDS)
 msgstr("Aggiungi contatto")
 
 //TODO: Same as in English? Localize or remove.
-//msgid(TOXID)
-//msgstr("Tox ID")
+//Keeping it for the moment.
+msgid(TOXID)
+msgstr("Tox ID")
 
 msgid(MESSAGE)
 msgstr("Messaggio")
@@ -124,8 +126,9 @@ msgid(OTHERSETTINGS)
 msgstr("Altro")
 
 //TODO: Same as in English? Localize or remove.
-//msgid(DPI)
-//msgstr("DPI")
+//Keepring it for the moment.
+msgid(DPI)
+msgstr("DPI")
 
 msgid(SAVELOCATION)
 msgstr("Salva Locazione")
@@ -137,16 +140,19 @@ msgid(NETWORK)
 msgstr("Rete")
 
 //TODO: Same as in English? Localize or remove.
-//msgid(IPV6)
-//msgstr("IPv6:")
+//Keeping it fot the moment.
+msgid(IPV6)
+msgstr("IPv6:")
 
 //TODO: Same as in English? Localize or remove.
-//msgid(UDP)
-//msgstr("UDP:")
+//Keeping it fot the moment.
+msgid(UDP)
+msgstr("UDP:")
 
 //TODO: Same as in English? Localize or remove.
-//msgid(PROXY)
-//msgstr("Proxy (SOCKS 5)")
+//Keeping it fot the moment.
+msgid(PROXY)
+msgstr("Proxy (SOCKS 5)")
 
 msgid(WARNING)
 msgstr("Cambiando le impostazioni del Network o del Proxy, verrai temporaneamente disconnesso dalla rete Tox")
