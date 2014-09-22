@@ -240,6 +240,9 @@ static void button_sendfile_onpress(void)
 
 static void button_sendfile_updatecolor(BUTTON *b)
 {
+    edit_setfocus(&edit_name);      // to reflect changes in name if a friend view is selected
+    edit_setfocus(&edit_status);
+
     FRIEND *f = sitem->data;
     if(f->online) {
         b->c1 = C_GREEN;
