@@ -1267,7 +1267,7 @@ int video_getframe(vpx_image_t *image)
 
 void playringtone()
 {
-
+	toxaudio_postmessage(AUDIO_PLAY_RINGTONE, 0, 0, NULL);
 }
 
 void stopringtone()
