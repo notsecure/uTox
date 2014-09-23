@@ -222,7 +222,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
     }
 }
 
-_Bool messages_mmove(MESSAGES *m, int px, int py, int width, int height, int mx, int my, int dx, int dy)
+_Bool messages_mmove(MESSAGES *m, int UNUSED(px), int UNUSED(py), int width, int UNUSED(height), int mx, int my, int dx, int UNUSED(dy))
 {
     if(m->idown < m->data->n) {
         int maxwidth = width - MESSAGES_X - TIME_WIDTH;
@@ -596,15 +596,15 @@ static void contextmenu_messages_onselect(uint8_t i)
 
 _Bool messages_mright(MESSAGES *m)
 {
+    static UI_STRING_ID menu_copy[] = {STR_COPY, STR_COPYWITHOUTNAMES};
     if(m->iover != ~0 && ((MESSAGE*)m->data->data[m->iover])->flags <= 3) {
-        uint8_t *names[] = {S(COPY), S(COPYWITHOUTNAMES)};
-        contextmenu_new(names, 2, contextmenu_messages_onselect);
+        contextmenu_new(countof(menu_copy), menu_copy, contextmenu_messages_onselect);
         return 1;
     }
     return 0;
 }
 
-_Bool messages_mwheel(MESSAGES *m, int height, double d)
+_Bool messages_mwheel(MESSAGES *UNUSED(m), int UNUSED(height), double UNUSED(d))
 {
     return 0;
 }
@@ -627,7 +627,7 @@ _Bool messages_mup(MESSAGES *m)
     return 0;
 }
 
-_Bool messages_mleave(MESSAGES *m)
+_Bool messages_mleave(MESSAGES *UNUSED(m))
 {
     return 0;
 }
@@ -869,7 +869,7 @@ void message_add(MESSAGES *m, MESSAGE *msg, MSG_DATA *p)
     message_setheight(m, msg, p);
 }
 
-void messages_set_typing(MESSAGES *m, MSG_DATA *p, int typing) {
+void messages_set_typing(MESSAGES *m, MSG_DATA *p, int UNUSED(typing)) {
     if(m->data == p) {
         // MSG_DATA associated with typing notification
         // corresponds to given MESSAGES, so update their height.

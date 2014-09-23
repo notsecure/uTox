@@ -1,6 +1,10 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+/* Support for large files. */
+#define _LARGEFILE_SOURCE
+#define _FILE_OFFSET_BITS 64
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -60,6 +64,8 @@ typedef struct msg_file MSG_FILE;
 
 typedef uint8_t char_t;
 
+#include "unused.h"
+
 #include "png/png.h"
 
 #include "tox.h"
@@ -89,6 +95,8 @@ typedef uint8_t char_t;
 
 #include "text.h"
 #include "util.h"
+
+#include "ui_dropdown.h"
 
 struct groupchat
 {

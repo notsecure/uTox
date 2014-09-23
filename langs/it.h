@@ -46,10 +46,6 @@ msgstr("Nuovo trasferimento file")
 msgid(TRANSFER_STARTED)
 msgstr("Trasferimento file iniziato")
 
-//TODO: Same as in English? Localize or remove.
-//msgid(TRANSFER___)
-//msgstr("...")
-
 msgid(TRANSFER_PAUSED)
 msgstr("Trasferimento file in pausa")
 
@@ -76,10 +72,6 @@ msgstr("Chiamata iniziata")
 
 msgid(ADDFRIENDS)
 msgstr("Aggiungi contatto")
-
-//TODO: Same as in English? Localize or remove.
-//msgid(TOXID)
-//msgstr("Tox ID")
 
 msgid(MESSAGE)
 msgstr("Messaggio")
@@ -123,10 +115,6 @@ msgstr("Video (input)")
 msgid(OTHERSETTINGS)
 msgstr("Altro")
 
-//TODO: Same as in English? Localize or remove.
-//msgid(DPI)
-//msgstr("DPI")
-
 msgid(SAVELOCATION)
 msgstr("Salva Locazione")
 
@@ -135,18 +123,6 @@ msgstr("Lingua")
 
 msgid(NETWORK)
 msgstr("Rete")
-
-//TODO: Same as in English? Localize or remove.
-//msgid(IPV6)
-//msgstr("IPv6:")
-
-//TODO: Same as in English? Localize or remove.
-//msgid(UDP)
-//msgstr("UDP:")
-
-//TODO: Same as in English? Localize or remove.
-//msgid(PROXY)
-//msgstr("Proxy (SOCKS 5)")
 
 msgid(WARNING)
 msgstr("Cambiando le impostazioni del Network o del Proxy, verrai temporaneamente disconnesso dalla rete Tox")
@@ -195,4 +171,60 @@ msgstr("Clicca per aprire")
 
 msgid(CANCELLED)
 msgstr("Annullato")
+
+//TODO: Localize or remove.
+//msgid(DPI_TINY)
+//msgstr("Tiny (50%)")
+
+//TODO: Localize or remove.
+//msgid(DPI_NORMAL)
+//msgstr("Normal (100%)")
+
+//TODO: Localize or remove.
+//msgid(DPI_BIG)
+//msgstr("Big (150%)")
+
+//TODO: Localize or remove.
+//msgid(DPI_LARGE)
+//msgstr("Large (200%)")
+
+//TODO: Localize or remove.
+//msgid(DPI_HUGE)
+//msgstr("Huge (250%)")
+
+//TODO: Localize or remove.
+//msgid(CONTACTS_FILTER_ALL)
+//msgstr("All")
+
+//TODO: Localize or remove.
+//msgid(CONTACTS_FILTER_ONLINE)
+//msgstr("Online")
+
+//TODO: Localize or remove.
+//msgid(PROXY_DISABLED)
+//msgstr("Disabled")
+
+//TODO: Localize or remove.
+//msgid(PROXY_FALLBACK)
+//msgstr("Fallback")
+
+//TODO: Localize or remove.
+//msgid(PROXY_ALWAYS_USE)
+//msgstr("Always use")
+
+//TODO: Localize or remove.
+//msgid(NO)
+//msgstr("No")
+
+//TODO: Localize or remove.
+//msgid(YES)
+//msgstr("Yes")
+
+//TODO: Localize or remove.
+//msgid(VIDEO_IN_NONE)
+//msgstr("None")
+
+//TODO: Localize or remove.
+//msgid(VIDEO_IN_DESKTOP)
+//msgstr("Desktop")
 

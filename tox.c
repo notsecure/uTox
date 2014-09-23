@@ -170,9 +170,9 @@ static void startft(Tox *tox, uint32_t fid, uint8_t *path, uint8_t *name, uint16
     }
 
     uint64_t size;
-    fseek(file, 0, SEEK_END);
-    size = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    fseeko(file, 0, SEEK_END);
+    size = ftello(file);
+    fseeko(file, 0, SEEK_SET);
 
     int filenumber = tox_new_file_sender(tox, fid, size, name, name_length);
     if(filenumber != -1) {
@@ -253,7 +253,7 @@ static void startft_inline(Tox *tox, uint16_t fid, void *pngdata)
     }
 }
 
-static void resetft(Tox *tox, FILE_T *ft, uint64_t start)
+static void resetft(Tox *UNUSED(tox), FILE_T *ft, uint64_t start)
 {
     if(start >= ft->total) {
         return;
@@ -306,7 +306,7 @@ void toxvideo_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *d
 
 #include "tox_callbacks.h"
 
-static void callback_file_send_request(Tox *tox, int32_t fid, uint8_t filenumber, uint64_t filesize, const uint8_t *filename, uint16_t filename_length, void *userdata)
+static void callback_file_send_request(Tox *tox, int32_t fid, uint8_t filenumber, uint64_t filesize, const uint8_t *filename, uint16_t filename_length, void *UNUSED(userdata))
 {
     if(filenumber > countof(friend[0].incoming)) {
         tox_file_send_control(tox, fid, 1, filenumber, TOX_FILECONTROL_KILL, NULL, 0);
@@ -342,7 +342,7 @@ static void callback_file_send_request(Tox *tox, int32_t fid, uint8_t filenumber
     }
 }
 
-static void callback_file_control(Tox *tox, int32_t fid, uint8_t receive_send, uint8_t filenumber, uint8_t control, const uint8_t *data, uint16_t length, void *userdata)
+static void callback_file_control(Tox *tox, int32_t fid, uint8_t receive_send, uint8_t filenumber, uint8_t control, const uint8_t *data, uint16_t length, void *UNUSED(userdata))
 {
     FILE_T *ft = (receive_send) ? &friend[fid].outgoing[filenumber] : &friend[fid].incoming[filenumber];
 
@@ -400,8 +400,11 @@ static void callback_file_control(Tox *tox, int32_t fid, uint8_t receive_send, u
                 if(!ft->inline_png) {
                     fclose(ft->data);
                     free(ft->buffer);
+                    postmessage(FRIEND_FILE_OUT_DONE, fid, filenumber, ft->path);
+                } else {
+                    postmessage(FRIEND_FILE_OUT_DONE, fid, filenumber, ft->data);
                 }
-                postmessage(FRIEND_FILE_OUT_DONE, fid, filenumber, ft->path);
+
             }
         }
         break;
@@ -421,7 +424,7 @@ static void callback_file_control(Tox *tox, int32_t fid, uint8_t receive_send, u
     debug("File Control\n");
 }
 
-static void callback_file_data(Tox *tox, int32_t fid, uint8_t filenumber, const uint8_t *data, uint16_t length, void *userdata)
+static void callback_file_data(Tox *UNUSED(tox), int32_t fid, uint8_t filenumber, const uint8_t *data, uint16_t length, void *UNUSED(userdata))
 {
     FILE_T *ft = &friend[fid].incoming[filenumber];
     if(ft->inline_png) {
@@ -562,21 +565,35 @@ static void write_save(Tox *tox)
 {
     void *data;
     uint32_t size;
-    uint8_t path[512], *p;
+    uint8_t path_tmp[512], path_real[512], *p;
     FILE *file;
 
     size = tox_size(tox);
     data = malloc(size);
     tox_save(tox, data);
 
-    p = path + datapath(path);
-    strcpy((char*)p, "tox_save");
+    p = path_real + datapath(path_real);
+    memcpy(p, "tox_save", sizeof("tox_save"));
 
-    file = fopen((char*)path, "wb");
+    unsigned int path_len = (p - path_real) + sizeof("tox_save");
+    memcpy(path_tmp, path_real, path_len);
+    memcpy(path_tmp + (path_len - 1), ".tmp", sizeof(".tmp"));
+
+    file = fopen((char*)path_tmp, "wb");
     if(file) {
         fwrite(data, size, 1, file);
         fclose(file);
-        debug("Saved data\n");
+        if (rename((char*)path_tmp, (char*)path_real) != 0) {
+            debug("Failed to rename file. %s to %s deleting and trying again\n", path_tmp, path_real);
+            remove(path_real);
+            if (rename((char*)path_tmp, (char*)path_real) != 0) {
+                debug("Saving Failed\n");
+            } else {
+                debug("Saved data\n");
+            }
+        } else {
+            debug("Saved data\n");
+        }
     }
 
     free(data);
@@ -588,27 +605,12 @@ void tox_settingschanged(void)
     tox_connected = 0;
     list_freeall();
 
-    free(dropdown_audio_in.drop);
-    dropdown_audio_in.drop = NULL;
-    dropdown_audio_in.dropcount = 0;
-    dropdown_audio_in.over = 0;
-    dropdown_audio_in.selected = 0;
+    list_dropdown_clear(&dropdown_audio_in);
+    list_dropdown_clear(&dropdown_audio_out);
+    list_dropdown_clear(&dropdown_video);
 
-    free(dropdown_audio_out.drop);
-    dropdown_audio_out.drop = NULL;
-    dropdown_audio_out.dropcount = 0;
-    dropdown_audio_out.over = 0;
-    dropdown_audio_out.selected = 0;
-
-    free(dropdown_video.drop);
-    dropdown_video.drop = NULL;
-    dropdown_video.dropcount = 0;
-    dropdown_video.over = 0;
-    dropdown_video.selected = 0;
-
-    dropdown_add(&dropdown_video, (uint8_t*)"None", NULL);
-    dropdown_add(&dropdown_video, (uint8_t*)"Desktop", (void*)1);
-
+    list_dropdown_add_localized(&dropdown_video, STR_VIDEO_IN_NONE, NULL);
+    list_dropdown_add_localized(&dropdown_video, STR_VIDEO_IN_DESKTOP, (void*)1);
 
     tox_thread_init = 0;
 
@@ -623,7 +625,7 @@ void tox_settingschanged(void)
     list_start();
 }
 
-void tox_thread(void *args)
+void tox_thread(void *UNUSED(args))
 {
     Tox *tox;
     ToxAv *av;
@@ -1258,18 +1260,18 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
     }
 
     case NEW_AUDIO_IN_DEVICE: {
-        dropdown_add(&dropdown_audio_in, data, param2 ? (void*)(size_t)(param2 - 1) : data);
+        list_dropdown_add_hardcoded(&dropdown_audio_in, data, param2 ? (void*)(size_t)(param2 - 1) : data);
         break;
     }
 
     case NEW_AUDIO_OUT_DEVICE: {
-        dropdown_add(&dropdown_audio_out, data, data);
+        list_dropdown_add_hardcoded(&dropdown_audio_out, data, data);
         break;
     }
 
     case NEW_VIDEO_DEVICE: {
+        list_dropdown_add_hardcoded(&dropdown_video, data + sizeof(void*), *(void**)data);
         dropdown_video.selected = dropdown_video.over = dropdown_video.dropcount;
-        dropdown_add(&dropdown_video, data + sizeof(void*), *(void**)data);
         break;
     }
 

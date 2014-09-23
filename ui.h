@@ -14,7 +14,6 @@ typedef struct scrollable SCROLLABLE;
 typedef struct edit EDIT;
 typedef struct panel PANEL;
 typedef struct button BUTTON;
-typedef struct dropdown DROPDOWN;
 typedef struct messages MESSAGES;
 struct panel
 {
@@ -53,7 +52,6 @@ extern MESSAGES messages_friend, messages_group;
 extern EDIT edit_name, edit_status, edit_addid, edit_addmsg, edit_msg, edit_search, edit_proxy_ip, edit_proxy_port;
 extern SCROLLABLE scroll_list;
 extern BUTTON button_add, button_settings, button_transfer;
-extern DROPDOWN dropdown_audio_in, dropdown_audio_out, dropdown_video, dropdown_dpi, dropdown_language, dropdown_proxy, dropdown_ipv6, dropdown_udp, dropdown_logging;
 
 enum {
     LANG_BG,
@@ -74,6 +72,8 @@ enum {
     LANG_UA, //15
     LANG_CN,
     LANG_TW,
+    //Do NOT add new values beyond this point, or alter LANGS_MAX accordingly.
+    LANGS_MAX = LANG_TW
 };
 
 enum {
@@ -136,14 +136,39 @@ enum {
     STR_PASTE,
     STR_DELETE,
     STR_SELECTALL,
+
     STR_REMOVE,
     STR_LEAVE,
     STR_ACCEPT,
     STR_IGNORE,
 
+    STR_REMOVE_FRIEND = STR_REMOVE,
+    STR_REMOVE_GROUP = STR_LEAVE,
+    STR_REQ_ACCEPT = STR_ACCEPT,
+    STR_REQ_DECLINE = STR_IGNORE,
+
     STR_CLICKTOSAVE,
     STR_CLICKTOOPEN,
     STR_CANCELLED,
+
+    STR_DPI_TINY,
+    STR_DPI_NORMAL,
+    STR_DPI_BIG,
+    STR_DPI_LARGE,
+    STR_DPI_HUGE,
+
+    STR_CONTACTS_FILTER_ALL,
+    STR_CONTACTS_FILTER_ONLINE,
+
+    STR_PROXY_DISABLED,
+    STR_PROXY_FALLBACK,
+    STR_PROXY_ALWAYS_USE,
+
+    STR_NO,
+    STR_YES,
+
+    STR_VIDEO_IN_NONE,
+    STR_VIDEO_IN_DESKTOP,
 
     STR_LANG_NATIVE_NAME,
     STR_LANG_ENGLISH_NAME,
@@ -152,10 +177,13 @@ enum {
 };
 
 #define DEFAULT_LANG LANG_EN
-#define S(x) (strings[LANG][STR_##x].length ? strings[LANG][STR_##x].str : strings[DEFAULT_LANG][STR_##x].str)
-#define SLEN(x) (strings[LANG][STR_##x].length ? strings[LANG][STR_##x].length : strings[DEFAULT_LANG][STR_##x].length)
-#define SPTR(x) (strings[LANG][STR_##x].length ? &strings[LANG][STR_##x] : &strings[DEFAULT_LANG][STR_##x])
-extern STRING strings[][STRS_MAX+1];
+#define S(x) (ui_gettext(LANG, (STR_##x))->str)
+#define SLEN(x) (ui_gettext(LANG, (STR_##x))->length)
+#define SPTR(x) (ui_gettext(LANG, (STR_##x)))
+#define SPTRFORLANG(l,x) (ui_gettext((l), (x)))
+typedef uint8_t UI_LANG_ID;
+typedef uint16_t UI_STRING_ID;
+STRING* ui_gettext(UI_LANG_ID lang, UI_STRING_ID string_id);
 
 uint8_t LANG;
 
