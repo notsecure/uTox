@@ -23,19 +23,19 @@ msgid(REQ_NO_MSG)
 msgstr("Erro: Sem mensagem")
 
 msgid(REQ_SELF_ID)
-msgstr("Error: Tox ID is self ID")
+msgstr("Erro: Tox ID is self ID")
 
 msgid(REQ_ALREADY_FRIENDS)
-msgstr("Error: Este ID TOX já consta na sua lista")
+msgstr("Erro: Este ID TOX já consta na sua lista")
 
 msgid(REQ_UNKNOWN)
-msgstr("Error: Desconhecido")
+msgstr("Erro: Desconhecido")
 
 msgid(REQ_BAD_CHECKSUM)
-msgstr("Error: ID Tox Inválido (checksum)")
+msgstr("Erro: ID Tox Inválido (checksum)")
 
 msgid(REQ_BAD_NOSPAM)
-msgstr("Error: Invalid Tox ID (bad nospam value)")
+msgstr("Erro: Invalid Tox ID (bad nospam value)")
 
 msgid(REQ_NO_MEMORY)
 msgstr("Error: Sem memória")
