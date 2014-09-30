@@ -1,5 +1,5 @@
 msgid(LANG_NATIVE_NAME)
-msgstr("Língua Brasileira")
+msgstr("Português Brasileiro")
 
 msgid(LANG_ENGLISH_NAME)
 msgstr("Brazilian Language")
@@ -11,7 +11,7 @@ msgid(REQ_RESOLVE)
 msgstr("Resolução de DNS em andamento...")
 
 msgid(REQ_INVALID_ID)
-msgstr("Erro: ID TOX inválido")
+msgstr("Erro: ID Tox inválido")
 
 msgid(REQ_EMPTY_ID)
 msgstr("Erro: ID Tox não especificado")
@@ -23,19 +23,19 @@ msgid(REQ_NO_MSG)
 msgstr("Erro: Sem mensagem")
 
 msgid(REQ_SELF_ID)
-msgstr("Erro: Tox ID is self ID")
+msgstr("Erro: Tox ID é o seu ID")
 
 msgid(REQ_ALREADY_FRIENDS)
-msgstr("Erro: Este ID TOX já consta na sua lista")
+msgstr("Erro: Este Tox ID já consta na sua lista")
 
 msgid(REQ_UNKNOWN)
 msgstr("Erro: Desconhecido")
 
 msgid(REQ_BAD_CHECKSUM)
-msgstr("Erro: ID Tox Inválido (checksum)")
+msgstr("Erro: Tox ID Inválido (checksum)")
 
 msgid(REQ_BAD_NOSPAM)
-msgstr("Erro: Invalid Tox ID (bad nospam value)")
+msgstr("Erro: Invalid ID Tox (bad nospam value)")
 
 msgid(REQ_NO_MEMORY)
 msgstr("Error: Sem memória")
