@@ -24,7 +24,7 @@ static void drawitembox(ITEM *i, int y)
     }
 }
 
-static void drawname(ITEM *i, int y, uint8_t *name, uint8_t *msg, uint16_t name_length, uint16_t msg_length)
+static void drawname(ITEM *i, int y, char_t *name, char_t *msg, STRING_IDX name_length, STRING_IDX msg_length)
 {
     setcolor((sitem == i) ? LIST_DARK : LIST_SELECTED);
     setfont(FONT_LIST_NAME);
@@ -65,7 +65,7 @@ static void drawitem(ITEM *i, int UNUSED(x), int y)
     case ITEM_FRIEND_ADD: {
         FRIENDREQ *f = i->data;
 
-        uint8_t name[TOX_FRIEND_ADDRESS_SIZE * 2];
+        char_t name[TOX_FRIEND_ADDRESS_SIZE * 2];
         id_to_string(name, f->id);
 
         drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
@@ -98,14 +98,16 @@ static ITEM* item_hit(int mx, int my, int UNUSED(height))
         return NULL;
     }
 
-    my /= ITEM_HEIGHT;
-    if(my >= searchcount) {
+    uint32_t item_idx = my;
+    item_idx /= ITEM_HEIGHT;
+
+    if(item_idx >= searchcount) {
         return NULL;
     }
 
     ITEM *i;
 
-    i = &item[my + search_offset[my]];
+    i = &item[item_idx + search_offset[item_idx]];
     return i;
 }
 
@@ -165,7 +167,7 @@ static void selectitem(ITEM *i)
         messages_friend.data = &f->msg;
         messages_updateheight(&messages_friend);
 
-        messages_friend.iover = ~0;
+        messages_friend.iover = MSG_IDX_MAX;
         messages_friend.panel.content_scroll->content_height = f->msg.height;
         messages_friend.panel.content_scroll->d = f->msg.scroll;
 
@@ -187,7 +189,7 @@ static void selectitem(ITEM *i)
         messages_group.data = &g->msg;
         messages_updateheight(&messages_group);
 
-        messages_group.iover = ~0;
+        messages_group.iover = MSG_IDX_MAX;
         messages_group.panel.content_scroll->content_height = g->msg.height;
         messages_group.panel.content_scroll->d = g->msg.scroll;
 
@@ -252,7 +254,7 @@ void list_addfriend(FRIEND *f)
 
 void list_addfriend2(FRIEND *f, FRIENDREQ *req)
 {
-    int i = 0;
+    uint32_t i = 0;
     while(i < itemcount) {
         if(item[i].data == req) {
             if(&item[i] == sitem) {
@@ -260,7 +262,7 @@ void list_addfriend2(FRIEND *f, FRIENDREQ *req)
                 panel_item[ITEM_FRIEND - 1].disabled = 0;
 
                 messages_friend.data = &f->msg;
-                messages_friend.iover = ~0;
+                messages_friend.iover = MSG_IDX_MAX;
                 messages_friend.panel.content_scroll->content_height = f->msg.height;
                 messages_friend.panel.content_scroll->d = f->msg.scroll;
 
@@ -458,7 +460,7 @@ _Bool list_mmove(void *UNUSED(n), int UNUSED(x), int UNUSED(y), int UNUSED(width
             int offset = search_offset[index];
             if(offset != INT_MAX) {
                 index += offset;
-                if(index >= 0 && index < itemcount) {
+                if(index >= 0 && ((uint32_t) index) < itemcount) {
                     nitem = item + index;
                 }
             }

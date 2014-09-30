@@ -18,6 +18,20 @@ static volatile _Bool tox_thread_msg, audio_thread_msg, video_thread_msg;
 
 static FILE_T *file_t[256], **file_tend = file_t;
 
+/* Writes log filename for fid to dest. returns length written */
+static int log_file_name(uint8_t *dest, uint16_t size_dest, Tox *tox, int fid)
+{
+    if (size_dest < TOX_CLIENT_ID_SIZE * 2 + sizeof(".txt"))
+        return -1;
+
+    uint8_t client_id[TOX_CLIENT_ID_SIZE];
+    tox_get_client_id(tox, fid, client_id);
+    cid_to_string(dest, client_id); dest += TOX_CLIENT_ID_SIZE * 2;
+    memcpy((char*)dest, ".txt", sizeof(".txt"));
+
+    return TOX_CLIENT_ID_SIZE * 2 + sizeof(".txt");
+}
+
 void log_write(Tox *tox, int fid, const uint8_t *message, uint16_t length, _Bool self)
 {
     if(!logging_enabled) {
@@ -27,13 +41,15 @@ void log_write(Tox *tox, int fid, const uint8_t *message, uint16_t length, _Bool
     uint8_t path[512], *p;
     uint8_t name[TOX_MAX_NAME_LENGTH];
     int namelen;
-    uint8_t client_id[TOX_CLIENT_ID_SIZE];
     FILE *file;
 
     p = path + datapath(path);
-    tox_get_client_id(tox, fid, client_id);
-    cid_to_string(p, client_id); p += TOX_CLIENT_ID_SIZE * 2;
-    strcpy((char*)p, ".txt");
+
+    int len = log_file_name(p, sizeof(path) - (p - path), tox, fid);
+    if (len == -1)
+        return;
+
+    p += len;
 
     file = fopen((char*)path, "ab");
     if(file) {
@@ -67,24 +83,38 @@ void log_write(Tox *tox, int fid, const uint8_t *message, uint16_t length, _Bool
 
 void log_read(Tox *tox, int fid)
 {
-    uint8_t path[512], *p, *pp, *end;
+    uint8_t path[512], *p, *pp, *end, *file_r;
     uint8_t client_id[TOX_CLIENT_ID_SIZE];
     uint32_t size, i;
 
     p = path + datapath(path);
-    tox_get_client_id(tox, fid, client_id);
-    cid_to_string(p, client_id); p += TOX_CLIENT_ID_SIZE * 2;
-    strcpy((char*)p, ".txt");
 
-    p = pp = file_raw((char*)path, &size);
-    if(!p) {
+    int len = log_file_name(p, sizeof(path) - (p - path), tox, fid);
+    if (len == -1)
         return;
+
+    p += len;
+
+    file_r = p = pp = file_raw((char*)path, &size);
+
+    if(!p) {
+        p = path + datapath_old(path);
+
+        len = log_file_name(p, sizeof(path) - (p - path), tox, fid);
+        if (len == -1)
+            return;
+
+        p += len;
+        p = pp = file_raw((char*)path, &size);
+        if (!p) {
+            return;
+        }
     }
 
     end = p + size;
 
     /* todo: some checks to avoid crashes with corrupted log files */
-    /* first find the last 128 messages in the log */
+    /* first find the last MAX_BACKLOG_MESSAGES messages in the log */
     i = 0;
     while(p < end) {
         uint16_t namelen, length;
@@ -92,15 +122,15 @@ void log_read(Tox *tox, int fid)
         memcpy(&length, p + 10, 2);
         p += 16 + namelen + length;;
 
-        if(++i > 128) {
+        if(++i > MAX_BACKLOG_MESSAGES) {
             memcpy(&namelen, pp + 8, 2);
             memcpy(&length, pp + 10, 2);
             pp += 16 + namelen + length;
         }
     }
 
-    if(i > 128) {
-        i = 128;
+    if(i > MAX_BACKLOG_MESSAGES) {
+        i = MAX_BACKLOG_MESSAGES;
     }
 
     MSG_DATA *m = &friend[fid].msg;
@@ -136,6 +166,8 @@ void log_read(Tox *tox, int fid)
         debug("loaded backlog: %.*s: %.*s\n", namelen, p, length, p + namelen);
         p += namelen + length;
     }
+
+    free(file_r);
 }
 
 static void fillbuffer(FILE_T *ft)
@@ -498,17 +530,19 @@ static _Bool load_save(Tox *tox)
 
     void *data = file_raw((char*)path, &size);
     if(!data) {
-        data = file_raw("tox_save", &size);
-        if(!data) {
-            return 0;
+        p = path + datapath_old(path);
+        strcpy((char*)p, "tox_save");
+        data = file_raw((char*)path, &size);
+        if (!data) {
+            data = file_raw("tox_save", &size);
+            if(!data) {
+                return 0;
+            }
         }
     }
-    int r = tox_load(tox, data, size);
-    free(data);
 
-    if(r != 0) {
-        return 0;
-    }
+    tox_load(tox, data, size);
+    free(data);
 
     friends = tox_count_friendlist(tox);
 
@@ -516,7 +550,7 @@ static _Bool load_save(Tox *tox)
     while(i != friends) {
         int size;
         FRIEND *f = &friend[i];
-        uint8_t name[128];
+        uint8_t name[TOX_MAX_NAME_LENGTH];
 
         f->msg.scroll = 1.0;
 
@@ -824,7 +858,8 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint8_t msg, uint16_t param1
         int r;
 
         if(!param1) {
-            r = tox_add_friend(tox, data, (uint8_t*)DEFAULT_ADD_MESSAGE, sizeof(DEFAULT_ADD_MESSAGE) - 1);
+            STRING* default_add_msg = SPTR(DEFAULT_FRIEND_REQUEST_MESSAGE);
+            r = tox_add_friend(tox, data, default_add_msg->str, default_add_msg->length);
         } else {
             r = tox_add_friend(tox, data, data + TOX_FRIEND_ADDRESS_SIZE, param1);
         }
@@ -1271,7 +1306,7 @@ void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
 
     case NEW_VIDEO_DEVICE: {
         list_dropdown_add_hardcoded(&dropdown_video, data + sizeof(void*), *(void**)data);
-        dropdown_video.selected = dropdown_video.over = dropdown_video.dropcount;
+        dropdown_video.selected = dropdown_video.over = (dropdown_video.dropcount - 1);
         break;
     }
 

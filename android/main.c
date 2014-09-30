@@ -129,7 +129,7 @@ void savefiledata(MSG_FILE *file)
 {
 }
 
-void setselection(uint8_t *data, uint16_t length)
+void setselection(char_t *data, STRING_IDX length)
 {
 }
 
@@ -173,6 +173,11 @@ void writesavedata(void *data, uint32_t len)
     }
 }
 
+int datapath_old(uint8_t *dest)
+{
+    return 0;
+}
+
 int datapath(uint8_t *dest)
 {
     return 0;
@@ -188,7 +193,7 @@ void setscale(void)
     }
 }
 
-void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_length)
+void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length)
 {
 }
 
@@ -219,7 +224,7 @@ void video_frame(uint32_t id, uint8_t *img_data, uint16_t width, uint16_t height
 {
 }
 
-void video_begin(uint32_t id, uint8_t *name, uint16_t name_length, uint16_t width, uint16_t height)
+void video_begin(uint32_t id, char_t *name, STRING_IDX name_length, uint16_t width, uint16_t height)
 {
 }
 

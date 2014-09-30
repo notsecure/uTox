@@ -63,13 +63,14 @@ enum {
 void *bitmap[32];
 HFONT font[32];
 HCURSOR cursors[8];
+HICON my_icon, unread_messages_icon;
 
 HWND hwnd, capturewnd;
 HINSTANCE hinstance;
 HDC main_hdc, hdc, hdcMem;
 HBRUSH hdc_brush;
 HBITMAP hdc_bm;
-HWND video_hwnd[256];
+HWND video_hwnd[MAX_NUM_FRIENDS];
 
 
 static char save_path[280];
@@ -160,7 +161,7 @@ void drawimage(void *data, int x, int y, int width, int height, int maxwidth, _B
 
 }
 
-void drawtext(int x, int y, char_t *str, uint16_t length)
+void drawtext(int x, int y, char_t *str, STRING_IDX length)
 {
     wchar_t out[length];
     length = utf8tonative(str, out, length);
@@ -168,7 +169,7 @@ void drawtext(int x, int y, char_t *str, uint16_t length)
     TextOutW(hdc, x, y, out, length);
 }
 
-int drawtext_getwidth(int x, int y, char_t *str, uint16_t length)
+int drawtext_getwidth(int x, int y, char_t *str, STRING_IDX length)
 {
     wchar_t out[length];
     length = utf8tonative(str, out, length);
@@ -179,7 +180,7 @@ int drawtext_getwidth(int x, int y, char_t *str, uint16_t length)
     return size.cx;
 }
 
-void drawtextwidth(int x, int width, int y, uint8_t *str, uint16_t length)
+void drawtextwidth(int x, int width, int y, char_t *str, STRING_IDX length)
 {
     wchar_t out[length];
     length = utf8tonative(str, out, length);
@@ -188,7 +189,7 @@ void drawtextwidth(int x, int width, int y, uint8_t *str, uint16_t length)
     DrawTextW(hdc, out, length, &r, DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 }
 
-void drawtextwidth_right(int x, int width, int y, char_t *str, uint16_t length)
+void drawtextwidth_right(int x, int width, int y, char_t *str, STRING_IDX length)
 {
     wchar_t out[length];
     length = utf8tonative(str, out, length);
@@ -197,7 +198,7 @@ void drawtextwidth_right(int x, int width, int y, char_t *str, uint16_t length)
     DrawTextW(hdc, out, length, &r, DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX | DT_RIGHT);
 }
 
-void drawtextrange(int x, int x2, int y, uint8_t *str, uint16_t length)
+void drawtextrange(int x, int x2, int y, char_t *str, STRING_IDX length)
 {
     wchar_t out[length];
     length = utf8tonative(str, out, length);
@@ -206,7 +207,7 @@ void drawtextrange(int x, int x2, int y, uint8_t *str, uint16_t length)
     DrawTextW(hdc, out, length, &r, DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 }
 
-void drawtextrangecut(int x, int x2, int y, char_t *str, uint16_t length)
+void drawtextrangecut(int x, int x2, int y, char_t *str, STRING_IDX length)
 {
     wchar_t out[length];
     length = utf8tonative(str, out, length);
@@ -215,7 +216,7 @@ void drawtextrangecut(int x, int x2, int y, char_t *str, uint16_t length)
     DrawTextW(hdc, out, length, &r, DT_SINGLELINE | DT_NOPREFIX);
 }
 
-int textwidth(char_t *str, uint16_t length)
+int textwidth(char_t *str, STRING_IDX length)
 {
     wchar_t out[length];
     length = utf8tonative(str, out, length);
@@ -225,29 +226,29 @@ int textwidth(char_t *str, uint16_t length)
     return size.cx;
 }
 
-int textfit(char_t *str, uint16_t length, int width)
+int textfit(char_t *str, STRING_IDX len, int width)
 {
-    wchar_t out[length];
-    length = utf8tonative(str, out, length);
+    wchar_t out[len];
+    int length = utf8tonative(str, out, len);
 
     int fit;
     SIZE size;
     GetTextExtentExPointW(hdc, out, length, width, &fit, NULL, &size);
 
-    return WideCharToMultiByte(CP_UTF8, 0, out, fit, (char*)str, 65536, NULL, 0);
+    return WideCharToMultiByte(CP_UTF8, 0, out, fit, (char*)str, len, NULL, 0);
 }
 
-int textfit_near(char_t *str, uint16_t length, int width)
+int textfit_near(char_t *str, STRING_IDX len, int width)
 {
     /*todo: near*/
-    wchar_t out[length];
-    length = utf8tonative(str, out, length);
+    wchar_t out[len];
+    int length = utf8tonative(str, out, len);
 
     int fit;
     SIZE size;
     GetTextExtentExPointW(hdc, out, length, width, &fit, NULL, &size);
 
-    return WideCharToMultiByte(CP_UTF8, 0, out, fit, (char*)str, 65536, NULL, 0);
+    return WideCharToMultiByte(CP_UTF8, 0, out, fit, (char*)str, len, NULL, 0);
 }
 
 void framerect(int x, int y, int right, int bottom, uint32_t color)
@@ -448,7 +449,7 @@ void savefiledata(MSG_FILE *file)
     }
 }
 
-void setselection(uint8_t *data, uint16_t length)
+void setselection(char_t *data, STRING_IDX length)
 {
 }
 
@@ -629,7 +630,7 @@ static void sendbitmap(HDC mem, HBITMAP hbm, int width, int height)
 
 void copy(int value)
 {
-    uint8_t data[32768];//!
+    char_t data[32768];//!TODO: De-hardcode this value.
     int len;
 
     if(edit_active()) {
@@ -678,8 +679,8 @@ void paste(void)
         }
     } else {
         wchar_t *d = GlobalLock(h);
-        uint8_t data[65536];
-        int len = WideCharToMultiByte(CP_UTF8, 0, d, -1, (char*)data, 65536, NULL, 0);
+        char_t data[65536]; //TODO: De-hardcode this value.
+        int len = WideCharToMultiByte(CP_UTF8, 0, d, -1, (char*)data, sizeof(data), NULL, 0);
         if(edit_active()) {
             edit_paste(data, len, 0);
         }
@@ -731,9 +732,21 @@ void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size)
     return bm;
 }
 
-int datapath(uint8_t *dest)
+int datapath_old(uint8_t *dest)
 {
     if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, (char*)dest))) {
+        uint8_t *p = dest + strlen((char*)dest);
+        strcpy(p, "\\Tox"); p += 4;
+        *p++ = '\\';
+        return p - dest;
+    }
+
+    return 0;
+}
+
+int datapath(uint8_t *dest)
+{
+    if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0, (char*)dest))) {
         uint8_t *p = dest + strlen((char*)dest);
         strcpy(p, "\\Tox"); p += 4;
         CreateDirectory((char*)dest, NULL);
@@ -744,7 +757,7 @@ int datapath(uint8_t *dest)
     return 0;
 }
 
-void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_length)
+void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length)
 {
     if(havefocus) {
         return;
@@ -754,8 +767,9 @@ void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_le
     flashing = 1;
 
     NOTIFYICONDATAW nid = {
-        .uFlags = NIF_INFO,
+        .uFlags = NIF_ICON | NIF_INFO,
         .hWnd = hwnd,
+        .hIcon = unread_messages_icon,
         .uTimeout = 5000,
         .dwInfoFlags = 0,
         .cbSize = sizeof(nid),
@@ -985,7 +999,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     int x, y;
     wchar_t classname[] = L"uTox", popupclassname[] = L"uToxgrab";
 
-    HICON myicon = LoadIcon(hInstance, MAKEINTRESOURCE(101));
+    my_icon = LoadIcon(hInstance, MAKEINTRESOURCE(101));
+    unread_messages_icon = LoadIcon(hInstance, MAKEINTRESOURCE(102));
+
     cursors[CURSOR_NONE] = LoadCursor(NULL, IDC_ARROW);
     cursors[CURSOR_HAND] = LoadCursor(NULL, IDC_HAND);
     cursors[CURSOR_TEXT] = LoadCursor(NULL, IDC_IBEAM);
@@ -999,14 +1015,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
         .style = CS_OWNDC | CS_DBLCLKS,
         .lpfnWndProc = WindowProc,
         .hInstance = hInstance,
-        .hIcon = myicon,
+        .hIcon = my_icon,
         .lpszClassName = classname,
     },
 
     wc2 = {
         .lpfnWndProc = GrabProc,
         .hInstance = hInstance,
-        .hIcon = myicon,
+        .hIcon = my_icon,
         .lpszClassName = popupclassname,
         .hbrBackground = (HBRUSH)GetStockObject (BLACK_BRUSH),
     };
@@ -1014,7 +1030,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     NOTIFYICONDATA nid = {
         .uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
         .uCallbackMessage = WM_NOTIFYICON,
-        .hIcon = myicon,
+        .hIcon = my_icon,
         .szTip = "Tox - tooltip",
         .cbSize = sizeof(nid),
     };
@@ -1024,52 +1040,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     RegisterClassW(&wc2);
 
     uint16_t langid = GetUserDefaultUILanguage() & 0xFFFF;
-    switch(langid & 0xFF) {
-    case 0x07:
-        LANG = LANG_DE;
-        break;
-    default:
-        LANG = DEFAULT_LANG;
-        break;
-    case 0x09:
-        LANG = LANG_EN;
-        break;
-    case 0x0A:
-        LANG = LANG_ES;
-        break;
-    case 0x0C:
-        LANG = LANG_FR;
-        break;
-    case 0x10:
-        LANG = LANG_IT;
-        break;
-    case 0x11:
-        LANG = LANG_JA;
-        break;
-    case 0x13:
-        LANG = LANG_NL;
-        break;
-    case 0x15:
-        LANG = LANG_PL;
-        break;
-    case 0x19:
-        LANG = LANG_RU;
-        break;
-    case 0x22:
-        LANG = LANG_UA;
-        break;
-    case 0x26:
-        LANG = LANG_LV;
-        break;
-    case 0x04:
-        if (langid == 0x0404) {
-            LANG = LANG_TW;
-        } else { /* if 0x0804 */
-            LANG = LANG_CN;
-        }
-
-        break;
-    }
+    LANG = ui_guess_lang_by_windows_lang_id(langid, DEFAULT_LANG);
 
     dropdown_language.selected = dropdown_language.over = LANG;
 
@@ -1249,6 +1220,15 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         if(flashing) {
             FlashWindow(hwnd, 0);
             flashing = 0;
+
+            NOTIFYICONDATAW nid = {
+                    .uFlags = NIF_ICON,
+                    .hWnd = hwnd,
+                    .hIcon = my_icon,
+                    .cbSize = sizeof(nid),
+            };
+
+            Shell_NotifyIconW(NIM_MODIFY, &nid);
         }
 
         havefocus = 1;
@@ -1541,7 +1521,7 @@ void video_frame(uint32_t id, uint8_t *img_data, uint16_t width, uint16_t height
     }
 }
 
-void video_begin(uint32_t id, uint8_t *name, uint16_t name_length, uint16_t width, uint16_t height)
+void video_begin(uint32_t id, char_t *name, STRING_IDX name_length, uint16_t width, uint16_t height)
 {
     if(video_hwnd[id]) {
         return;

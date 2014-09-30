@@ -24,12 +24,12 @@
 
 #define DEFAULT_NAME "Tox User"
 #define DEFAULT_STATUS "Toxing on uTox"
-#define DEFAULT_ADD_MESSAGE "Please accept this friend request."
 #define DEFAULT_SCALE 2
 
-#define VERSION "0.1.3"
+#define VERSION "0.1.8"
 
 #define MAX_CALLS 16
+#define MAX_BACKLOG_MESSAGES 128
 
 typedef struct
 {
@@ -48,29 +48,13 @@ typedef struct
     uint8_t id[TOX_FRIEND_ADDRESS_SIZE], msg[0];
 }FRIENDREQ;
 
-typedef struct
-{
-    uint32_t n, width, height, id;
-    uint16_t istart, start, iend, end;
-    void **data;
-    double scroll;
-}MSG_DATA;
-
-typedef struct groupchat GROUPCHAT;
-typedef struct friend FRIEND;
 typedef struct edit_change EDIT_CHANGE;
-
-typedef struct msg_file MSG_FILE;
-
-typedef uint8_t char_t;
 
 #include "unused.h"
 
 #include "png/png.h"
 
 #include "tox.h"
-#include "dns.h"
-#include "friend.h"
 
 #ifdef __WIN32__
 #include "win32/main.h"
@@ -82,11 +66,16 @@ typedef uint8_t char_t;
 #endif
 #endif
 
+#include "sized_string.h"
+#include "ui_i18n_decls.h"
+
 #include "ui.h"
 #include "svg.h"
 
-#include "list.h"
 #include "messages.h"
+#include "dns.h"
+#include "friend.h"
+#include "list.h"
 #include "edit.h"
 #include "scrollable.h"
 #include "button.h"
@@ -98,20 +87,6 @@ typedef uint8_t char_t;
 
 #include "ui_dropdown.h"
 
-struct groupchat
-{
-    uint32_t peers;
-    uint16_t name_length, topic_length, typed_length;
-    uint8_t name[128], topic[128]; //static sizes for now
-    uint8_t *typed;
-    uint8_t *peername[256];
-
-    EDIT_CHANGE **edit_history;
-    uint16_t edit_history_cur, edit_history_length;
-
-    MSG_DATA msg;
-};
-
 volatile _Bool tox_thread_init, audio_thread_init, video_thread_init;
 _Bool tox_connected;
 
@@ -119,9 +94,11 @@ _Bool audio_preview, video_preview;
 
 volatile _Bool logging_enabled;
 
+#define MAX_NUM_FRIENDS 256
+
 //friends and groups
 //note: assumes array size will always be large enough
-FRIEND friend[256];
+FRIEND friend[MAX_NUM_FRIENDS];
 GROUPCHAT group[1024];
 uint32_t friends, groups;
 
@@ -218,13 +195,14 @@ enum
 void drawalpha(int bm, int x, int y, int width, int height, uint32_t color);
 void loadalpha(int bm, void *data, int width, int height);
 void desktopgrab(_Bool video);
-void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_length);
+void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length);
 void setscale(void);
 void drawimage(void *data, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position);
 void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size);
 void showkeyboard(_Bool show);
 void redraw(void);
 
+int datapath_old(uint8_t *dest);
 int datapath(uint8_t *dest);
 void config_osdefaults(UTOX_SAVE *r);
 
@@ -232,7 +210,7 @@ void config_osdefaults(UTOX_SAVE *r);
 struct
 {
     uint8_t status;
-    uint16_t name_length, statusmsg_length;
+    STRING_IDX name_length, statusmsg_length;
     char_t *statusmsg, name[TOX_MAX_NAME_LENGTH];
     char_t id[TOX_FRIEND_ADDRESS_SIZE * 2];
 }self;
@@ -254,16 +232,17 @@ uint8_t addfriend_status;
 void postmessage(uint32_t msg, uint16_t param1, uint16_t param2, void *data);
 
 /* draw functions*/
-void drawtext(int x, int y, uint8_t *str, uint16_t length);
-int drawtext_getwidth(int x, int y, uint8_t *str, uint16_t length);
-void drawtextwidth(int x, int width, int y, uint8_t *str, uint16_t length);
-void drawtextwidth_right(int x, int width, int y, uint8_t *str, uint16_t length);
-void drawtextrange(int x, int x2, int y, uint8_t *str, uint16_t length);
-void drawtextrangecut(int x, int x2, int y, uint8_t *str, uint16_t length);
+void drawtext(int x, int y, char_t *str, STRING_IDX length);
+int drawtext_getwidth(int x, int y, char_t *str, STRING_IDX length);
+void drawtextwidth(int x, int width, int y, char_t *str, STRING_IDX length);
+void drawtextwidth_right(int x, int width, int y, char_t *str, STRING_IDX length);
+void drawtextrange(int x, int x2, int y, char_t *str, STRING_IDX length);
+void drawtextrangecut(int x, int x2, int y, char_t *str, STRING_IDX length);
 
-int textwidth(uint8_t *str, uint16_t length);
-int textfit(uint8_t *str, uint16_t length, int width);
-int textfit_near(uint8_t *str, uint16_t length, int width);
+int textwidth(char_t *str, STRING_IDX length);
+int textfit(char_t *str, STRING_IDX length, int width);
+int textfit_near(char_t *str, STRING_IDX length, int width);
+//TODO: Seems to be unused. Remove?
 int text_drawline(int x, int right, int y, uint8_t *str, int i, int length, int highlight, int hlen, uint16_t lineheight);
 
 void framerect(int x, int y, int right, int bottom, uint32_t color);
@@ -298,10 +277,10 @@ void sysmexit(void);
 void sysmsize(void);
 void sysmmini(void);
 
-void setselection(uint8_t *data, uint16_t length);
+void setselection(char_t *data, STRING_IDX length);
 
 void video_frame(uint32_t id, uint8_t *img_data, uint16_t width, uint16_t height, _Bool resize);
-void video_begin(uint32_t id, uint8_t *name, uint16_t name_length, uint16_t width, uint16_t height);
+void video_begin(uint32_t id, char_t *name, STRING_IDX name_length, uint16_t width, uint16_t height);
 void video_end(uint32_t id);
 
 void* video_detect(void);
@@ -325,7 +304,7 @@ void playringtone();
 void stopringtone();
 
 #define drawstr(x, y, i) drawtext(x, y, S(i), SLEN(i))
-#define drawstr_getwidth(x, y, str) drawtext_getwidth(x, y, (uint8_t*)str, sizeof(str) - 1)
-#define strwidth(x) textwidth((uint8_t*)x, sizeof(x) - 1)
+#define drawstr_getwidth(x, y, str) drawtext_getwidth(x, y, (char_t*)str, sizeof(str) - 1)
+#define strwidth(x) textwidth((char_t*)x, sizeof(x) - 1)
 
 #endif
