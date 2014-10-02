@@ -34,7 +34,7 @@ Note: building for Windows requires mingw-w64 (mingw lacks some header files), o
 
 > windres icons/icon.rc -O coff -o icon.res
 
->  gcc -o uTox.exe *.c ./png/png.c icon.res -lgdi32 -lmsimg32 -ldnsapi -lcomdlg32 -lopenal32 -lole32 -lstrmiids -loleaut32 -lvpx -ltoxav -ltox.dll -lws2_32 -lwinmm 
+>  gcc -o uTox.exe *.c ./png/png.c icon.res -lgdi32 -lmsimg32 -ldnsapi -lcomdlg32 -lopenal32 -lole32 -lstrmiids -loleaut32 -lvpx -ltoxav -ltox.dll -lws2_32
 
 ### Xlib
 
