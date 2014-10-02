@@ -305,6 +305,8 @@ static void video_thread(void *args)
 static ALCdevice *device_out, *device_in;
 static ALCcontext *context;
 static ALuint source[MAX_CALLS];
+static ALuint ringSrc = 0;
+
 
 static ALCdevice* alcopencapture(void *handle)
 {
@@ -437,6 +439,7 @@ static void audio_thread(void *args)
     }
 
     alGenSources(countof(source), source);
+    alGenSources(1, &ringSrc);
 
     audio_thread_init = 1;
 
@@ -556,10 +559,10 @@ static void audio_thread(void *args)
                 {
 
                     int errorLoadingWave=0;
-                    ALCdevice *dev = NULL;
-                    ALCcontext *ctx = NULL;
+                   // ALCdevice *dev = NULL;
+                   // ALCcontext *ctx = NULL;
 
-                    const char *defname = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
+                   // const char *defname = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
 
                     /* Create buffer to store samples */
                     ALuint buf2;
@@ -569,11 +572,11 @@ static void audio_thread(void *args)
                     /* Fill buffer with Sine-Wave */
                     float freq1 = 441.f;
                     float freq2 = 882.f;
-                    float freq=40.f;
-                    int seconds = 1.0;
+                    //float freq=40.f;
+                    int seconds = 10.0;
                     unsigned sample_rate = 22050;
 
-                    size_t buf_size = seconds * sample_rate;
+                    size_t buf_size = seconds * sample_rate *2; //16 bit (2 bytes per sample)
 
                     short *samples;
                     samples = (short*)malloc(buf_size*sizeof(short));
@@ -582,12 +585,12 @@ static void audio_thread(void *args)
                     {
                         if((ii/1000)%2==1 )
                         {
-                            samples[ii] = 15760 * sin( (2.0*3.1415926*freq1)/sample_rate * ii );
+                            samples[ii] = 15000 * sin( (2.0*3.1415926*freq1)/sample_rate * ii ); //15000=volume lvl. It can be from zero to 32700
 
                         }
                         else
                         {
-                            samples[ii] = 15760 * sin( (2.0*3.1415926*freq2)/sample_rate * ii );
+                            samples[ii] = 15000 * sin( (2.0*3.1415926*freq2)/sample_rate * ii );
                         }
                     }
 
@@ -602,7 +605,7 @@ static void audio_thread(void *args)
                     ALenum format=0;
 
 
-                    do //a run-once "loop" that we can break out of if we need to.
+                    do //a run once "loop" that we can break out of if we need to.
                     {
 
                         debug("Lets read a wave and play it as a ring tone\n");
@@ -714,12 +717,22 @@ static void audio_thread(void *args)
 
                     //PLAY
                     /* Set-up sound source and play buffer */
-                    ALuint src = 0;
-                    alGenSources(1, &src);
-                    alSourcei(src, AL_BUFFER, buf2);
-                    alSourcePlay(src);
+                   // ALuint ringSrc = 0;
+                   // alGenSources(1, &ringSrc);
+                    alSourcei(ringSrc, AL_BUFFER, buf2);
+                    alSourcePlay(ringSrc);
                     if(samples)
                     free(samples);
+                    break;
+                }
+                 case AUDIO_STOP_RINGTONE:
+                {
+                    ALint state;
+                    alGetSourcei(ringSrc, AL_SOURCE_STATE, &state);
+                    //if (state!=AL_PLAYING)
+                   // alSourcePlay(source);
+                    if(state==AL_PLAYING)
+                    alSourceStop(ringSrc);
                     break;
                 }
 

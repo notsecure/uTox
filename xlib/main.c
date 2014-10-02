@@ -1243,5 +1243,5 @@ void playringtone()
 
 void stopringtone()
 {
-	
+	toxaudio_postmessage(AUDIO_STOP_RINGTONE, 0, 0, NULL);	
 }
