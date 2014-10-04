@@ -501,7 +501,8 @@ void paste(void)
 static void pastebestformat(const Atom atoms[], int len, Atom selection)
 {
     const Atom supported[] = {XA_PNG_IMG, XA_URI_LIST, XA_UTF8_STRING};
-    int i, j;
+    int i;
+    size_t j;
     for (i = 0; i < len; i++) {
         debug("Supported type: %s\n", XGetAtomName(display, atoms[i]));
     }
@@ -882,7 +883,7 @@ int main(int argc, char *argv[])
     /* Xft draw context/color */
     renderpic = XRenderCreatePicture (display, drawbuf, XRenderFindStandardFormat(display, PictStandardRGB24), 0, NULL);
 
-    XRenderColor xrcolor = {0};
+    XRenderColor xrcolor;
     colorpic = XRenderCreateSolidFill(display, &xrcolor);
 
     /*xftdraw = XftDrawCreate(display, drawbuf, visual, cmap);

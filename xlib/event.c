@@ -41,7 +41,7 @@ _Bool doevent(XEvent event)
         }
 
         havefocus = 1;
-        XWMHints hints = {0};
+        XWMHints hints;
         XSetWMHints(display, window, &hints);
         break;
     }
@@ -303,7 +303,7 @@ _Bool doevent(XEvent event)
                 edit_char(buffer[i], (ev->state & 4) != 0, ev->state);
             }
             uint32_t key = keysym2ucs(sym);
-            if(key != ~0) {
+            if(key != (uint32_t)~0) {
                 edit_char(key, (ev->state & 4) != 0, ev->state);
             } else {
                 edit_char(sym, 1, ev->state);
@@ -440,7 +440,7 @@ _Bool doevent(XEvent event)
                     break;
                 }
 
-                if (pastebuf.left < len) {
+                if ((unsigned long int)pastebuf.left < len) {
                     pastebuf.len += len - pastebuf.left;
                     pastebuf.data = realloc(pastebuf.data, pastebuf.len);
                     pastebuf.left = len;

@@ -245,7 +245,7 @@ static void startft_inline(Tox *tox, uint16_t fid, void *pngdata)
 
     int filenumber = tox_new_file_sender(tox, fid, size, (uint8_t*)"inline.png", sizeof("inline.png") - 1);
     if(filenumber != -1) {
-        if(filenumber > countof(friend[0].outgoing)) {
+        if((size_t)filenumber > countof(friend[0].outgoing)) {
             tox_file_send_control(tox, fid, 0, filenumber, TOX_FILECONTROL_KILL, NULL, 0);
             return;
         }

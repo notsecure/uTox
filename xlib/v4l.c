@@ -221,7 +221,7 @@ _Bool v4l_init(char *dev_name)
 
 void v4l_close(void)
 {
-    int i;
+    uint32_t i;
     for(i = 0; i < n_buffers; ++i) {
         if(-1 == munmap(buffers[i].start, buffers[i].length)) {
             debug("munmap error\n");
@@ -234,7 +234,7 @@ void v4l_close(void)
 _Bool v4l_startread(void)
 {
     debug("start webcam\n");
-    unsigned int i;
+    uint32_t i;
     enum v4l2_buf_type type;
 
     for (i = 0; i < n_buffers; ++i) {

@@ -98,7 +98,7 @@ GLYPH* font_getglyph(FONT *f, uint32_t ch)
     uint32_t hash = ch % 128;
     GLYPH *g = f->glyphs[hash], *s = g;
     if(g) {
-        while(g->ucs4 != ~0) {
+        while(g->ucs4 != (uint32_t)~0) {
             if(g->ucs4 == ch) {
                 return g;
             }
@@ -374,7 +374,7 @@ static void freefonts(void)
         for(j = 0; j != countof(f->glyphs); j++) {
             GLYPH *g = f->glyphs[j];
             if(g) {
-                while(g->ucs4 != ~0) {
+                while(g->ucs4 != (uint32_t)~0) {
                     if(g->pic) {
                         XRenderFreePicture(display, g->pic);
                     }
