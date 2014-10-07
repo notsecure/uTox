@@ -101,8 +101,9 @@ static void drawgroup(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(he
         {
             uint8_t buf[134];
             memcpy(buf, name + 1, name[0]);
-            memcpy(buf + name[0], ", ", 2);
-
+            if(i != g->peers - 1){
+                memcpy(buf + name[0], ", ", 2);
+            }
             int w = textwidth(buf, name[0] + 2);
             if(k + w >= width) {
                 drawtext(k, 18 * SCALE, (uint8_t*)"...", 3);
