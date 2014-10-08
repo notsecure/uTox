@@ -160,12 +160,13 @@ _Bool string_to_id(char_t *w, char_t *a)
     return 1;
 }
 
-int sprint_bytes(uint8_t *dest, uint64_t bytes)
+int sprint_bytes(uint8_t *dest, unsigned int size, uint64_t bytes)
 {
-    char *str[] = {"B", "KiB", "MiB", "GiB"};
+    char *str[] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"};
+    int max_id = countof(str) - 1;
     int i = 0;
     double f = bytes;
-    while(bytes >= 1024) {
+    while((bytes >= 1024) && (i < max_id)) {
         bytes /= 1024;
         f /= 1024.0;
         i++;
@@ -173,9 +174,10 @@ int sprint_bytes(uint8_t *dest, uint64_t bytes)
 
     int r;
 
-    r = sprintf((char*)dest, "%u", (uint32_t)bytes);
+    r = snprintf((char*)dest, size, "%u", (uint32_t)bytes);
+
     //missing decimals
-    r += sprintf((char*)dest + r, "%s", str[i]);
+    r += snprintf((char*)dest + r, size - r, "%s", str[i]);
     return r;
 }
 
@@ -321,9 +323,10 @@ void unicode_to_utf8(uint32_t ch, char_t *dst)
     return;// 0;
 }
 
-uint8_t* tohtml(uint8_t *str, uint16_t length)
+char_t* tohtml(char_t *str, STRING_IDX length)
 {
-    int i = 0, len = 0;
+    STRING_IDX i = 0;
+    int len = 0;
     while(i != length) {
         switch(str[i]) {
         case '<':
@@ -341,7 +344,7 @@ uint8_t* tohtml(uint8_t *str, uint16_t length)
         i += utf8_len(str + i);
     }
 
-    uint8_t *out = malloc(length + len + 1);
+    char_t *out = malloc(length + len + 1);
     i = 0; len = 0;
     while(i != length) {
         switch(str[i]) {
@@ -361,7 +364,7 @@ uint8_t* tohtml(uint8_t *str, uint16_t length)
         }
 
         default: {
-            int r = utf8_len(str + i);
+            STRING_IDX r = utf8_len(str + i);
             memcpy(out + len, str + i, r);
             len += r;
             i += r;
@@ -529,6 +532,13 @@ UTOX_SAVE* config_load(void)
     strcpy((char*)p, "utox_save");
 
     save = file_text((char*)path);
+
+    if (!save) {
+        p = path + datapath_old(path);
+        strcpy((char*)p, "utox_save");
+        save = file_text((char*)path);
+    }
+
     if(save || (save = file_text("utox_save"))) {
         if(save->version == SAVE_VERSION) {
             /* validate values */
@@ -569,7 +579,7 @@ NEXT:
     edit_proxy_ip.length = strlen((char*)save->proxy_ip);
     strcpy((char*)edit_proxy_ip.data, (char*)save->proxy_ip);
     if(save->proxy_port) {
-        edit_proxy_port.length = sprintf((char*)edit_proxy_port.data, "%u", save->proxy_port);
+        edit_proxy_port.length = snprintf((char*)edit_proxy_port.data, edit_proxy_port.maxlength + 1, "%u", save->proxy_port);
     }
 
     logging_enabled = save->logging_enabled;

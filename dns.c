@@ -45,7 +45,7 @@ static void writechecksum(uint8_t *address)
         checksum[i % 2] ^= address[i];
 }
 
-static uint32_t parseargument(uint8_t *dest, char_t *src, uint16_t length, void **pdns3)
+static int64_t parseargument(uint8_t *dest, char_t *src, uint16_t length, void **pdns3)
 {
     /* parses format groupbot@utox.org -> groupbot._tox.utox.org */
 
@@ -114,6 +114,8 @@ static uint32_t parseargument(uint8_t *dest, char_t *src, uint16_t length, void 
                     memcpy(dest + 1, out, len);
                     d = dest + 1 + len;
                     *pdns3 = dns3;
+                } else {
+                    return -1;
                 }
             }
 
@@ -132,6 +134,24 @@ static uint32_t parseargument(uint8_t *dest, char_t *src, uint16_t length, void 
     }
 
     if(!at) {
+        if ((d - dest) > TOXDNS_MAX_RECOMMENDED_NAME_LENGTH)
+            return -1;
+
+        void *dns3 = istox3((uint8_t *)"utox.org", sizeof("utox.org") - 1);
+
+        if (!dns3)
+            return -1;
+
+        uint8_t out[256];
+        int len = tox_generate_dns3_string(dns3, out, sizeof(out), &pin, dest, d - dest);
+        if(len == -1)
+            return -1;
+
+        dest[0] = '_';
+        memcpy(dest + 1, out, len);
+        d = dest + 1 + len;
+        *pdns3 = dns3;
+
         memcpy(d, "._tox.utox.org", 14);
         d += 14;
     }
@@ -257,10 +277,14 @@ static void dns_thread(void *data)
 {
     uint16_t length = *(uint16_t*)data;
     uint8_t result[256];
+    _Bool success = 0;
 
     void *dns3 = NULL;
-    uint32_t pin = parseargument(result, data + 2, length, &dns3);
-    _Bool success = 0;
+    int64_t ret = parseargument(result, data + 2, length, &dns3);
+    if (ret == -1)
+        goto FAIL;
+
+    uint32_t pin = ret;
 
     #ifdef __WIN32__
     DNS_RECORD *record = NULL;
@@ -435,7 +459,7 @@ static void dns_thread(void *data)
 
 void dns_request(char_t *name, uint16_t length)
 {
-    void *data = malloc((2 + length < TOX_FRIEND_ADDRESS_SIZE) ? TOX_FRIEND_ADDRESS_SIZE : 2 + length * sizeof(char_t));
+    void *data = malloc((2u + length < TOX_FRIEND_ADDRESS_SIZE) ? TOX_FRIEND_ADDRESS_SIZE : 2u + length * sizeof(char_t));
     memcpy(data, &length, 2);
     memcpy(data + 2, name, length * sizeof(char_t));
 

@@ -24,7 +24,7 @@ static void drawitembox(ITEM *i, int y)
     }
 }
 
-static void drawname(ITEM *i, int y, uint8_t *name, uint8_t *msg, uint16_t name_length, uint16_t msg_length)
+static void drawname(ITEM *i, int y, char_t *name, char_t *msg, STRING_IDX name_length, STRING_IDX msg_length)
 {
     setcolor((sitem == i) ? LIST_DARK : LIST_SELECTED);
     setfont(FONT_LIST_NAME);
@@ -35,7 +35,7 @@ static void drawname(ITEM *i, int y, uint8_t *name, uint8_t *msg, uint16_t name_
     drawtextwidth(LIST_STATUS_X, LIST_RIGHT - LIST_STATUS_X - SCALE * 16, y + LIST_STATUS_Y,  msg, msg_length);
 }
 
-static void drawitem(ITEM *i, int x, int y)
+static void drawitem(ITEM *i, int UNUSED(x), int y)
 {
     drawitembox(i, y);
 
@@ -68,7 +68,7 @@ static void drawitem(ITEM *i, int x, int y)
     case ITEM_FRIEND_ADD: {
         FRIENDREQ *f = i->data;
 
-        uint8_t name[TOX_FRIEND_ADDRESS_SIZE * 2];
+        char_t name[TOX_FRIEND_ADDRESS_SIZE * 2];
         id_to_string(name, f->id);
         if(!(avatars_hidden)){
             drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
@@ -92,7 +92,7 @@ void list_scale(void)
     scroll_list.content_height = searchcount * ITEM_HEIGHT;
 }
 
-static ITEM* item_hit(int mx, int my, int height)
+static ITEM* item_hit(int mx, int my, int UNUSED(height))
 {
     if(mx < LIST_X || mx >= LIST_RIGHT) {
         return NULL;
@@ -102,14 +102,16 @@ static ITEM* item_hit(int mx, int my, int height)
         return NULL;
     }
 
-    my /= ITEM_HEIGHT;
-    if(my >= searchcount) {
+    uint32_t item_idx = my;
+    item_idx /= ITEM_HEIGHT;
+
+    if(item_idx >= searchcount) {
         return NULL;
     }
 
     ITEM *i;
 
-    i = &item[my + search_offset[my]];
+    i = &item[item_idx + search_offset[item_idx]];
     return i;
 }
 
@@ -169,7 +171,7 @@ static void selectitem(ITEM *i)
         messages_friend.data = &f->msg;
         messages_updateheight(&messages_friend);
 
-        messages_friend.iover = ~0;
+        messages_friend.iover = MSG_IDX_MAX;
         messages_friend.panel.content_scroll->content_height = f->msg.height;
         messages_friend.panel.content_scroll->d = f->msg.scroll;
 
@@ -191,7 +193,7 @@ static void selectitem(ITEM *i)
         messages_group.data = &g->msg;
         messages_updateheight(&messages_group);
 
-        messages_group.iover = ~0;
+        messages_group.iover = MSG_IDX_MAX;
         messages_group.panel.content_scroll->content_height = g->msg.height;
         messages_group.panel.content_scroll->d = g->msg.scroll;
 
@@ -256,7 +258,7 @@ void list_addfriend(FRIEND *f)
 
 void list_addfriend2(FRIEND *f, FRIENDREQ *req)
 {
-    int i = 0;
+    uint32_t i = 0;
     while(i < itemcount) {
         if(item[i].data == req) {
             if(&item[i] == sitem) {
@@ -264,7 +266,7 @@ void list_addfriend2(FRIEND *f, FRIENDREQ *req)
                 panel_item[ITEM_FRIEND - 1].disabled = 0;
 
                 messages_friend.data = &f->msg;
-                messages_friend.iover = ~0;
+                messages_friend.iover = MSG_IDX_MAX;
                 messages_friend.panel.content_scroll->content_height = f->msg.height;
                 messages_friend.panel.content_scroll->d = f->msg.scroll;
 
@@ -293,7 +295,7 @@ void list_addfriendreq(FRIENDREQ *f)
     i->data = f;
 }
 
-void list_draw(void *n, int x, int y, int width, int height)
+void list_draw(void *UNUSED(n), int UNUSED(x), int y, int UNUSED(width), int UNUSED(height))
 {
     int my, j, k;
 
@@ -437,7 +439,7 @@ void list_selectswap(void)
 }
 
 
-_Bool list_mmove(void *n, int x, int y, int width, int height, int mx, int my, int dx, int dy)
+_Bool list_mmove(void *UNUSED(n), int UNUSED(x), int UNUSED(y), int UNUSED(width), int height, int mx, int my, int UNUSED(dx), int dy)
 {
     ITEM *i = item_hit(mx, my, height);
 
@@ -462,7 +464,7 @@ _Bool list_mmove(void *n, int x, int y, int width, int height, int mx, int my, i
             int offset = search_offset[index];
             if(offset != INT_MAX) {
                 index += offset;
-                if(index >= 0 && index < itemcount) {
+                if(index >= 0 && ((uint32_t) index) < itemcount) {
                     nitem = item + index;
                 }
             }
@@ -474,7 +476,7 @@ _Bool list_mmove(void *n, int x, int y, int width, int height, int mx, int my, i
     return draw;
 }
 
-_Bool list_mdown(void *n)
+_Bool list_mdown(void *UNUSED(n))
 {
     _Bool draw = 0;
 
@@ -501,19 +503,20 @@ static void contextmenu_list_onselect(uint8_t i)
     list_deleteritem();
 }
 
-_Bool list_mright(void *n)
+_Bool list_mright(void *UNUSED(n))
 {
+    static UI_STRING_ID menu_friend[] = {STR_REMOVE_FRIEND};
+    static UI_STRING_ID menu_group[] = {STR_REMOVE_GROUP};
+    static UI_STRING_ID menu_request[] = {STR_REQ_ACCEPT, STR_REQ_DECLINE};
+
     if(mitem) {
         ritem = mitem;
         if(mitem->item == ITEM_FRIEND) {
-            uint8_t *remove = (uint8_t*)"Remove";
-            contextmenu_new(&remove, 1, contextmenu_list_onselect);
+            contextmenu_new(countof(menu_friend), menu_friend, contextmenu_list_onselect);
         } else if(mitem->item == ITEM_GROUP) {
-            uint8_t *leave = (uint8_t*)"Leave";
-            contextmenu_new(&leave, 1, contextmenu_list_onselect);
+            contextmenu_new(countof(menu_group), menu_group, contextmenu_list_onselect);
         } else {
-            uint8_t *names[] = {(uint8_t*)"Accept", (uint8_t*)"Ignore"};
-            contextmenu_new(names, 2, contextmenu_list_onselect);
+            contextmenu_new(countof(menu_request), menu_request, contextmenu_list_onselect);
         }
         return 1;
         //listpopup(mitem->item);
@@ -522,12 +525,12 @@ _Bool list_mright(void *n)
     return 0;
 }
 
-_Bool list_mwheel(void *n, int height, double d)
+_Bool list_mwheel(void *UNUSED(n), int UNUSED(height), double UNUSED(d))
 {
     return 0;
 }
 
-_Bool list_mup(void *n)
+_Bool list_mup(void *UNUSED(n))
 {
     _Bool draw = 0;
     if(sitem_mousedown && abs(sitem_dy) >= 5) {
@@ -577,7 +580,7 @@ _Bool list_mup(void *n)
     return draw;
 }
 
-_Bool list_mleave(void *n)
+_Bool list_mleave(void *UNUSED(n))
 {
     if(mitem) {
         mitem = NULL;

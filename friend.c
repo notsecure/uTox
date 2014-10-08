@@ -1,12 +1,13 @@
 #include "main.h"
 
-void friend_setname(FRIEND *f, char_t *name, uint16_t length)
+void friend_setname(FRIEND *f, char_t *name, STRING_IDX length)
 {
     if(f->name && (length != f->name_length || memcmp(f->name, name, length) != 0)) {
         MESSAGE *msg = malloc(sizeof(MESSAGE) + sizeof(" is now known as ") - 1 + f->name_length + length);
-        msg->flags = 2;
+        msg->author = 0;
+        msg->msg_type = MSG_TYPE_ACTION_TEXT;
         msg->length = sizeof(" is now known as ") - 1 + f->name_length + length;
-        uint8_t *p = msg->msg;
+        char_t *p = msg->msg;
         memcpy(p, f->name, f->name_length); p += f->name_length;
         memcpy(p, " is now known as ", sizeof(" is now known as ") - 1); p += sizeof(" is now known as ") - 1;
         memcpy(p, name, length);
@@ -30,7 +31,8 @@ void friend_setname(FRIEND *f, char_t *name, uint16_t length)
 void friend_sendimage(FRIEND *f, void *data, void *pngdata, uint16_t width, uint16_t height)
 {
     MSG_IMG *msg = malloc(sizeof(MSG_IMG));
-    msg->flags = 5;
+    msg->author = 1;
+    msg->msg_type = MSG_TYPE_IMAGE;
     msg->w = width;
     msg->h = height;
     msg->zoom = 0;
@@ -51,7 +53,8 @@ void friend_recvimage(FRIEND *f, void *pngdata, uint32_t size)
     }
 
     MSG_IMG *msg = malloc(sizeof(MSG_IMG));
-    msg->flags = 4;
+    msg->author = 0;
+    msg->msg_type = MSG_TYPE_IMAGE;
     msg->w = width;
     msg->h = height;
     msg->zoom = 0;
@@ -61,10 +64,10 @@ void friend_recvimage(FRIEND *f, void *pngdata, uint32_t size)
     message_add(&messages_friend, (void*)msg, &f->msg);
 }
 
-void friend_notify(FRIEND *f, uint8_t *str, uint16_t str_length, uint8_t *msg, uint16_t msg_length)
+void friend_notify(FRIEND *f, char_t *str, STRING_IDX str_length, char_t *msg, STRING_IDX msg_length)
 {
     int len = f->name_length + str_length + 3;
-    uint8_t title[len + 1], *p = title;
+    char_t title[len + 1], *p = title;
     memcpy(p, str, str_length); p += str_length;
     *p++ = ' ';
     *p++ = '(';
@@ -74,12 +77,13 @@ void friend_notify(FRIEND *f, uint8_t *str, uint16_t str_length, uint8_t *msg, u
     notify(title, len, msg, msg_length);
 }
 
-void friend_addmessage_notify(FRIEND *f, char_t *data, uint16_t length)
+void friend_addmessage_notify(FRIEND *f, char_t *data, STRING_IDX length)
 {
     MESSAGE *msg = malloc(sizeof(MESSAGE) + length);
-    msg->flags = 2;
+    msg->author = 0;
+    msg->msg_type = MSG_TYPE_ACTION_TEXT;
     msg->length = length;
-    uint8_t *p = msg->msg;
+    char_t *p = msg->msg;
     memcpy(p, data, length);
 
     message_add(&messages_friend, msg, &f->msg);
@@ -95,11 +99,15 @@ void friend_addmessage(FRIEND *f, void *data)
 
     message_add(&messages_friend, data, &f->msg);
 
-    if(msg->flags < 4) {
-        uint8_t m[msg->length + 1];
+    switch(msg->msg_type) {
+    case MSG_TYPE_TEXT:
+    case MSG_TYPE_ACTION_TEXT: {
+        char_t m[msg->length + 1];
         memcpy(m, msg->msg, msg->length);
         m[msg->length] = 0;
         notify(f->name, f->name_length, m, msg->length);
+        break;
+    }
     }
 
     if(sitem->data != f) {
@@ -107,7 +115,12 @@ void friend_addmessage(FRIEND *f, void *data)
     }
 }
 
-void friend_addid(uint8_t *id, char_t *msg, uint16_t msg_length)
+void friend_set_typing(FRIEND *f, int typing) {
+    f->typing = typing;
+    messages_set_typing(&messages_friend, &f->msg, typing);
+}
+
+void friend_addid(uint8_t *id, char_t *msg, STRING_IDX msg_length)
 {
     void *data = malloc(TOX_FRIEND_ADDRESS_SIZE + msg_length * sizeof(char_t));
     memcpy(data, id, TOX_FRIEND_ADDRESS_SIZE);
@@ -116,7 +129,7 @@ void friend_addid(uint8_t *id, char_t *msg, uint16_t msg_length)
     tox_postmessage(TOX_ADDFRIEND, msg_length, 0, data);
 }
 
-void friend_add(char_t *name, uint16_t length, char_t *msg, uint16_t msg_length)
+void friend_add(char_t *name, STRING_IDX length, char_t *msg, STRING_IDX msg_length)
 {
     if(!length) {
         addfriend_status = ADDF_NONAME;
@@ -135,10 +148,10 @@ void friend_add(char_t *name, uint16_t length, char_t *msg, uint16_t msg_length)
 
 void friend_free(FRIEND *f)
 {
-    int i = 0;
-    while(i != f->edit_history_length) {
-        free(f->edit_history[i]);
-        i++;
+    uint16_t j = 0;
+    while(j != f->edit_history_length) {
+        free(f->edit_history[j]);
+        j++;
     }
     free(f->edit_history);
 
@@ -146,14 +159,16 @@ void friend_free(FRIEND *f)
     free(f->status_message);
     free(f->typed);
 
-    i = 0;
+    MSG_IDX i = 0;
     while(i < f->msg.n) {
         MESSAGE *msg = f->msg.data[i];
-        if((msg->flags & (~1)) == 4) {
+        switch(msg->msg_type) {
+        case MSG_TYPE_IMAGE: {
             //MSG_IMG *img = (void*)msg;
             //todo: free image
+            break;
         }
-        if((msg->flags & (~1)) == 6) {
+        case MSG_TYPE_FILE: {
             MSG_FILE *file = (void*)msg;
             free(file->path);
             FILE_T *ft = &f->incoming[file->filenumber];
@@ -166,9 +181,11 @@ void friend_free(FRIEND *f)
                 }
             }
 
-            if(msg->flags & 1) {
+            if(msg->author) {
                 ft->status = FT_NONE;
             }
+            break;
+        }
         }
         message_free(msg);
         i++;
@@ -188,27 +205,27 @@ void friend_free(FRIEND *f)
 
 void group_free(GROUPCHAT *g)
 {
-    int i = 0;
+    uint16_t i = 0;
     while(i != g->edit_history_length) {
         free(g->edit_history[i]);
         i++;
     }
     free(g->edit_history);
 
-    uint8_t **np = g->peername;
-    i = 0;
-    while(i < g->peers) {
-        uint8_t *n = *np++;
+    char_t **np = g->peername;
+    uint32_t j = 0;
+    while(j < g->peers) {
+        char_t *n = *np++;
         if(n) {
             free(n);
-            i++;
         }
+        j++;
     }
 
-    i = 0;
-    while(i < g->msg.n) {
-        free(g->msg.data[i]);
-        i++;
+    MSG_IDX k = 0;
+    while(k < g->msg.n) {
+        free(g->msg.data[k]);
+        k++;
     }
 
     free(g->msg.data);

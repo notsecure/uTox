@@ -1,11 +1,11 @@
 /* edits */
-static uint8_t edit_name_data[128], edit_status_data[128], edit_addid_data[TOX_FRIEND_ADDRESS_SIZE * 2], edit_addmsg_data[1024], edit_msg_data[65535], edit_search_data[127],
+static char_t edit_name_data[128], edit_status_data[128], edit_addid_data[TOX_FRIEND_ADDRESS_SIZE * 2], edit_addmsg_data[1024], edit_msg_data[65535], edit_search_data[127],
     edit_proxy_ip_data[256], edit_proxy_port_data[8];
 
 static void edit_name_onenter(void)
 {
-    uint8_t *data = edit_name_data;
-    uint16_t length = edit_name.length;
+    char_t *data = edit_name_data;
+    STRING_IDX length = edit_name.length;
 
     if(!length) {
         return;
@@ -19,8 +19,8 @@ static void edit_name_onenter(void)
 
 static void edit_status_onenter(void)
 {
-    uint8_t *data = edit_status_data;
-    uint16_t length = edit_status.length;
+    char_t *data = edit_status_data;
+    STRING_IDX length = edit_status.length;
 
     if(!length) {
         return;
@@ -40,7 +40,7 @@ static void edit_status_onenter(void)
 
 static void edit_msg_onenter(void)
 {
-    uint16_t length = edit_msg.length;
+    STRING_IDX length = edit_msg.length;
     if(length == 0) {
         return;
     }
@@ -53,7 +53,8 @@ static void edit_msg_onenter(void)
         }
 
         MESSAGE *msg = malloc(length + sizeof(MESSAGE));
-        msg->flags = 1;
+        msg->author = 1;
+        msg->msg_type = MSG_TYPE_TEXT;
         msg->length = length;
         memcpy(msg->msg, edit_msg_data, length);
 
@@ -77,8 +78,8 @@ static void edit_msg_onenter(void)
 
 static void edit_search_onchange(void)
 {
-    uint8_t *data = edit_search_data;
-    uint16_t length = edit_search.length;
+    char_t *data = edit_search_data;
+    STRING_IDX length = edit_search.length;
 
     if(!length) {
         memset(search_offset, 0, sizeof(search_offset));
@@ -92,6 +93,26 @@ static void edit_search_onchange(void)
 
     redraw();
     return;
+}
+
+
+static void edit_proxy_ip_port_onlosefocus(void)
+{
+    edit_proxy_port.data[edit_proxy_port.length] = 0;
+    uint16_t proxy_port = strtol((char*)edit_proxy_port.data, NULL, 0);
+
+    if (memcmp(options.proxy_address, edit_proxy_ip.data, edit_proxy_ip.length) == 0 &&
+        options.proxy_address[edit_proxy_ip.length] == 0 &&
+        options.proxy_port == proxy_port)
+            return;
+
+    memcpy(options.proxy_address, edit_proxy_ip.data, edit_proxy_ip.length);
+    options.proxy_address[edit_proxy_ip.length] = 0;
+
+    options.proxy_port = proxy_port;
+
+    if (options.proxy_enabled)
+        tox_settingschanged();
 }
 
 SCROLLABLE edit_addmsg_scroll = {
@@ -122,6 +143,7 @@ edit_toxid = {
     .data = self.id,
     .readonly = 1,
     .noborder = 1,
+    .select_completely = 1,
 },
 
 edit_status = {
@@ -154,18 +176,20 @@ edit_msg = {
 edit_search = {
     .maxlength = sizeof(edit_search_data),
     .data = edit_search_data,
-    .empty_str = (uint8_t*)"Search friends",
+    .empty_str = { .i18nal = STR_CONTACTS_FILTER_EDIT_HINT },
     .onchange = edit_search_onchange,
 },
 
 edit_proxy_ip = {
     .maxlength = sizeof(edit_proxy_ip_data) - 1,
     .data = edit_proxy_ip_data,
-    .empty_str = (uint8_t*)"IP",
+    .onlosefocus = edit_proxy_ip_port_onlosefocus,
+    .empty_str = { .i18nal = STR_PROXY_EDIT_HINT_IP },
 },
 
 edit_proxy_port = {
     .maxlength = sizeof(edit_proxy_port_data) - 1,
     .data = edit_proxy_port_data,
-    .empty_str = (uint8_t*)"Port",
+    .onlosefocus = edit_proxy_ip_port_onlosefocus,
+    .empty_str = { .i18nal = STR_PROXY_EDIT_HINT_PORT },
 };

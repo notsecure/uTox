@@ -4,25 +4,30 @@ static EDIT *active_edit;
 
 static struct
 {
-    uint16_t start, length;
-    uint16_t p1, p2, pm;
+    STRING_IDX start, length;
+    STRING_IDX p1, p2, pm;
+    //TODO: pm field doesn't seem to be used. Remove?
 }edit_sel;
 static _Bool edit_select;
 
 static void setactive(EDIT *edit)
 {
     if(edit != active_edit) {
-        active_edit = edit;
-
         if(active_edit && active_edit->onlosefocus) {
             active_edit->onlosefocus();
         }
+
+        active_edit = edit;
     }
 
 }
 
 void edit_draw(EDIT *edit, int x, int y, int width, int height)
 {
+    if((width - 4 * SCALE - SCROLL_WIDTH) < 0) {
+        return;
+    }
+
     if(baseline && y > baseline - font_small_lineheight - 4 * SCALE) {
         y = baseline - font_small_lineheight - 4 * SCALE;
     }
@@ -50,14 +55,15 @@ void edit_draw(EDIT *edit, int x, int y, int width, int height)
     }
 
 
-    if(!edit->length && edit->empty_str) {
+    if(!edit->length && maybe_i18nal_string_is_valid(&edit->empty_str)) {
+        STRING* empty_str_text = maybe_i18nal_string_get(&edit->empty_str);
         setcolor(C_GRAY2);
-        drawtext(x + 2 * SCALE, yy + 2 * SCALE, edit->empty_str, strlen((char*)edit->empty_str));
+        drawtext(x + 2 * SCALE, yy + 2 * SCALE, empty_str_text->str, empty_str_text->length);
     }
 
     _Bool a = (edit == active_edit);
     drawtextmultiline(x + 2 * SCALE, x + width - 2 * SCALE - (edit->multiline ? SCROLL_WIDTH : 0), yy + 2 * SCALE, y, y + height, font_small_lineheight, edit->data, edit->length,
-                      a ? edit_sel.start : 0xFFFF, a ? edit_sel.length : 0xFFFF, edit->multiline);
+                      a ? edit_sel.start : STRING_IDX_MAX, a ? edit_sel.length : STRING_IDX_MAX, edit->multiline);
 
     if(edit->multiline) {
         popclip();
@@ -90,10 +96,16 @@ _Bool edit_mmove(EDIT *edit, int px, int py, int width, int height, int x, int y
     }
 
     if(edit == active_edit && edit_select) {
+        if (edit->select_completely) {
+            edit_setfocus(edit);
+            redraw = 1;
+            return redraw;
+        }
+ 
         setfont(FONT_TEXT);
         edit_sel.p2 = hittextmultiline(x - 2 * SCALE, width - 4 * SCALE - (edit->multiline ? SCROLL_WIDTH : 0), y - 2 * SCALE, INT_MAX, font_small_lineheight, edit->data, edit->length, edit->multiline);
 
-        uint16_t start, length;
+        STRING_IDX start, length;
         if(edit_sel.p2 > edit_sel.p1) {
             start = edit_sel.p1;
             length = edit_sel.p2 - edit_sel.p1;
@@ -153,9 +165,9 @@ _Bool edit_dclick(EDIT *edit, _Bool triclick)
         edit->mouseover_char = edit->length;
     }
 
-    uint8_t c = triclick ? '\n' : ' ';
+    char_t c = triclick ? '\n' : ' ';
 
-    uint16_t i = edit->mouseover_char;
+    STRING_IDX i = edit->mouseover_char;
     while(i != 0 && edit->data[i - 1] != c) {
         i -= utf8_unlen(edit->data + i);
     }
@@ -194,6 +206,7 @@ static void contextmenu_edit_onselect(uint8_t i)
 
 _Bool edit_mright(EDIT *edit)
 {
+    static UI_STRING_ID menu_edit[] = {STR_CUT, STR_COPY, STR_PASTE, STR_DELETE, STR_SELECTALL};
     if(edit->mouseover_char > edit->length) {
         edit->mouseover_char = edit->length;
     }
@@ -208,8 +221,7 @@ _Bool edit_mright(EDIT *edit)
             edit_select = 1;
         }
 
-        uint8_t *names[] = {S(CUT), S(COPY), S(PASTE), S(DELETE), S(SELECTALL)};
-        contextmenu_new(names, 5, contextmenu_edit_onselect);
+        contextmenu_new(countof(menu_edit), menu_edit, contextmenu_edit_onselect);
 
         return 1;
     }
@@ -262,9 +274,9 @@ static void edit_redraw(void)
     redraw();
 }
 
-static uint16_t edit_change_do(EDIT *edit, EDIT_CHANGE *c)
+static STRING_IDX edit_change_do(EDIT *edit, EDIT_CHANGE *c)
 {
-    uint16_t r = c->start;
+    STRING_IDX r = c->start;
     if(c->remove) {
         memmove(edit->data + c->start + c->length, edit->data + c->start, edit->length - c->start);
         memcpy(edit->data + c->start, c->data, c->length);
@@ -279,7 +291,7 @@ static uint16_t edit_change_do(EDIT *edit, EDIT_CHANGE *c)
     return r;
 }
 
-static void edit_do(EDIT *edit, uint16_t start, uint16_t length, _Bool remove)
+static void edit_do(EDIT *edit, STRING_IDX start, STRING_IDX length, _Bool remove)
 {
     EDIT_CHANGE *new, **history;
 
@@ -314,9 +326,9 @@ static void edit_do(EDIT *edit, uint16_t start, uint16_t length, _Bool remove)
     edit->history_length = edit->history_cur;
 }
 
-static uint16_t edit_undo(EDIT *edit)
+static STRING_IDX edit_undo(EDIT *edit)
 {
-    uint16_t r = 0xFFFF;
+    STRING_IDX r = STRING_IDX_MAX;
     if(edit->history_cur) {
         edit->history_cur--;
         r = edit_change_do(edit, edit->history[edit->history_cur]);
@@ -324,9 +336,9 @@ static uint16_t edit_undo(EDIT *edit)
     return r;
 }
 
-static uint16_t edit_redo(EDIT *edit)
+static STRING_IDX edit_redo(EDIT *edit)
 {
-    uint16_t r = 0xFFFF;
+    STRING_IDX r = STRING_IDX_MAX;
     if(edit->history_cur != edit->history_length) {
         r = edit_change_do(edit, edit->history[edit->history_cur]);
         edit->history_cur++;
@@ -352,7 +364,7 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
             }
 
             if(edit_sel.length == 0) {
-                uint16_t p = edit_sel.start;
+                STRING_IDX p = edit_sel.start;
                 if(p == 0) {
                     break;
                 }
@@ -364,11 +376,13 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
                     }
                 }
 
-                do {
-                    p -= utf8_unlen(&edit->data[p]);
-                } while((flags & 4) && p != 0 && edit->data[p - 1] != ' ' && edit->data[p - 1] != '\n');
+                if (p != 0) {
+                    do {
+                        p -= utf8_unlen(&edit->data[p]);
+                    } while((flags & 4) && p != 0 && edit->data[p - 1] != ' ' && edit->data[p - 1] != '\n');
+                }
 
-                uint16_t len = edit_sel.start - p;
+                STRING_IDX len = edit_sel.start - p;
                 edit_do(edit, edit_sel.start - len, len, 1);
                 memmove(edit->data + edit_sel.start - len, edit->data + edit_sel.start, edit->length - edit_sel.start);
                 edit->length -= len;
@@ -387,7 +401,7 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
                 return;
             }
 
-            uint8_t *p = active_edit->data + edit_sel.start;
+            char_t *p = active_edit->data + edit_sel.start;
             if(edit_sel.length) {
                 edit_do(edit, edit_sel.start, edit_sel.length, 1);
                 memmove(p, p + edit_sel.length, active_edit->length - (edit_sel.start + edit_sel.length));
@@ -406,7 +420,7 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
         }
 
         case KEY_LEFT: {
-            uint16_t p = edit_sel.p2;
+            STRING_IDX p = edit_sel.p2;
             if(p != 0) {
                 if(flags & 4) {
                     while(p != 0 && edit->data[p - 1] == ' ') {
@@ -435,7 +449,7 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
         }
 
         case KEY_RIGHT: {
-            uint16_t p = edit_sel.p2;
+            STRING_IDX p = edit_sel.p2;
             if(flags & 4) {
                 while(p != edit->length && edit->data[p] == ' ') {
                     p++;
@@ -544,8 +558,8 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
 
         case KEY('Z'): {
             if(!(flags & 1)) {
-                uint16_t p = edit_undo(edit);
-                if(p != 0xFFFF) {
+                STRING_IDX p = edit_undo(edit);
+                if(p != STRING_IDX_MAX) {
                     edit_sel.p1 = p;
                     edit_sel.p2 = p;
                     edit_sel.start = p;
@@ -558,8 +572,8 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
         }
 
         case KEY('Y'): {
-            uint16_t p = edit_redo(edit);
-            if(p != 0xFFFF) {
+            STRING_IDX p = edit_redo(edit);
+            if(p != STRING_IDX_MAX) {
                 edit_sel.p1 = p;
                 edit_sel.p2 = p;
                 edit_sel.start = p;
@@ -610,7 +624,7 @@ void edit_char(uint32_t ch, _Bool control, uint8_t flags)
     } else if(!edit->readonly) {
         uint8_t len = unicode_to_utf8_len(ch);
         if(edit->length - edit_sel.length + len <= edit->maxlength) {
-            uint8_t *p = edit->data + edit_sel.start;
+            char_t *p = edit->data + edit_sel.start;
 
             if(edit_sel.length) {
                 edit_do(edit, edit_sel.start, edit_sel.length, 1);
@@ -682,7 +696,7 @@ void edit_paste(char_t *data, int length, _Bool select)
         return;
     }
 
-    uint8_t *p = active_edit->data + edit_sel.start;
+    char_t *p = active_edit->data + edit_sel.start;
 
     if(edit_sel.length) {
         edit_do(active_edit, edit_sel.start, edit_sel.length, 1);
@@ -728,7 +742,7 @@ _Bool edit_active(void)
     return (active_edit != NULL);
 }
 
-void edit_setstr(EDIT *edit, uint8_t *str, uint16_t length)
+void edit_setstr(EDIT *edit, char_t *str, STRING_IDX length)
 {
     if(length >= edit->maxlength) {
         length = edit->maxlength;

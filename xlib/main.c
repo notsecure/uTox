@@ -65,7 +65,7 @@ XSizeHints *xsh;
 
 _Bool havefocus = 0;
 
-Window video_win[256];
+Window video_win[MAX_NUM_FRIENDS];
 
 Atom wm_protocols, wm_delete_window;
 
@@ -96,13 +96,13 @@ void *libgtk;
 struct
 {
     int len;
-    uint8_t data[65536];
+    char_t data[65536]; //TODO: De-hardcode this value.
 }clipboard;
 
 struct
 {
     int len;
-    uint8_t data[65536];
+    char_t data[65536]; //TODO: De-hardcode this value.
 }primary;
 
 struct
@@ -222,7 +222,7 @@ void drawimage(void *data, int x, int y, int width, int height, int maxwidth, _B
     }
 }
 
-static int _drawtext(int x, int xmax, int y, uint8_t *str, uint16_t length)
+static int _drawtext(int x, int xmax, int y, char_t *str, STRING_IDX length)
 {
     GLYPH *g;
     uint8_t len;
@@ -426,7 +426,7 @@ void savefiledata(MSG_FILE *file)
         //fall back to working dir inline.png
         FILE *fp = fopen("inline.png", "wb");
         if(fp) {
-            fwrite(file->path + ((file->flags & 1) ? 4 : 0), file->size, 1, fp);
+            fwrite(file->path + (file->author ? 4 : 0), file->size, 1, fp);
             fclose(fp);
 
             free(file->path);
@@ -436,7 +436,7 @@ void savefiledata(MSG_FILE *file)
     }
 }
 
-void setselection(uint8_t *data, uint16_t length)
+void setselection(char_t *data, STRING_IDX length)
 {
     if(!length) {
         return;
@@ -643,6 +643,11 @@ void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size)
     return (void*)picture;
 }
 
+int datapath_old(uint8_t *dest)
+{
+    return 0;
+}
+
 int datapath(uint8_t *dest)
 {
     char *home = getenv("HOME");
@@ -651,6 +656,13 @@ int datapath(uint8_t *dest)
     dest[l++] = '/';
 
     return l;
+}
+
+void flush_file(FILE *file)
+{
+    fflush(file);
+    int fd = fileno(file);
+    fsync(fd);
 }
 
 void setscale(void)
@@ -688,7 +700,7 @@ void setscale(void)
     }
 }
 
-void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_length)
+void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length)
 {
     if(havefocus) {
         return;
@@ -698,7 +710,7 @@ void notify(uint8_t *title, uint16_t title_length, uint8_t *msg, uint16_t msg_le
     XSetWMHints(display, window, &hints);
 
     #ifdef HAVE_DBUS
-    uint8_t *str = tohtml(msg, msg_length);
+    char_t *str = tohtml(msg, msg_length);
 
     dbus_notify((char*)title, (char*)str);
 
@@ -736,43 +748,9 @@ static int systemlang(void)
         str = getenv("LANG");
     }
     if(!str) {
-        return LANG_EN;
+        return DEFAULT_LANG;
     }
-    if(strstr(str, "de")) {
-        return LANG_DE;
-    }
-    if(strstr(str, "es")) {
-        return LANG_ES;
-    }
-    if(strstr(str, "fr")) {
-        return LANG_FR;
-    }
-    if(strstr(str, "it")) {
-        return LANG_IT;
-    }
-    if(strstr(str, "ja")) {
-        return LANG_JA;
-    }
-    if(strstr(str, "lv")) {
-        return LANG_LV;
-    }
-    if(strstr(str, "nl")) {
-        return LANG_NL;
-    }
-    if(strstr(str, "pl")) {
-        return LANG_PL;
-    }
-    if(strstr(str, "ru")) {
-        return LANG_RU;
-    }
-    if(strstr(str, "uk")) {
-        return LANG_UA;
-    }
-    if(strstr(str, "zh_CN")) {
-        return LANG_CN;
-    }
-
-    return LANG_EN;
+    return ui_guess_lang_by_posix_locale(str, DEFAULT_LANG);
 }
 
 int main(int argc, char *argv[])
@@ -918,19 +896,17 @@ int main(int argc, char *argv[])
     LANG = systemlang();
     dropdown_language.selected = dropdown_language.over = LANG;
 
-    /* set-up desktop video input */
-    dropdown_add(&dropdown_video, (uint8_t*)"None", NULL);
-    dropdown_add(&dropdown_video, (uint8_t*)"Desktop", (void*)1);
-
     /* make the window visible */
     XMapWindow(display, window);
 
     if (xim) {
-        if((xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, window, XNFocusWindow, window, NULL)) == NULL) {
+        if((xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, window, XNFocusWindow, window, NULL))) {
+            XSetICFocus(xic);
+        } else {
             printf("Cannot open input method\n");
             XCloseIM(xim);
+            xim = 0;
         }
-        XSetICFocus(xic);
     }
 
     /* set the width/height of the drawing region */
@@ -1059,8 +1035,8 @@ void video_frame(uint32_t id, uint8_t *img_data, uint16_t width, uint16_t height
     };
 
     /* scale image if needed */
-    uint8_t new_data[attrs.width * attrs.height * 4];
-    if(attrs.width != width || attrs.height != height) {
+    uint8_t *new_data = malloc(attrs.width * attrs.height * 4);
+    if(new_data && (attrs.width != width || attrs.height != height)) {
         scale_rgbx_image(img_data, width, height, new_data, attrs.width, attrs.height);
         image.data = (char*)new_data;
     }
@@ -1071,9 +1047,10 @@ void video_frame(uint32_t id, uint8_t *img_data, uint16_t width, uint16_t height
     XPutImage(display, pixmap, gc, &image, 0, 0, 0, 0, attrs.width, attrs.height);
     XCopyArea(display, pixmap, video_win[id], gc, 0, 0, attrs.width, attrs.height, 0, 0);
     XFreePixmap(display, pixmap);
+    free(new_data);
 }
 
-void video_begin(uint32_t id, uint8_t *name, uint16_t name_length, uint16_t width, uint16_t height)
+void video_begin(uint32_t id, char_t *name, STRING_IDX name_length, uint16_t width, uint16_t height)
 {
     Window *win = &video_win[id];
     if(*win) {
@@ -1123,11 +1100,14 @@ void* video_detect(void)
 {
     char dev_name[] = "/dev/videoXX", *first = NULL;
 
+    // Indicate that we support desktop capturing.
+    postmessage(NEW_VIDEO_DEVICE, STR_VIDEO_IN_DESKTOP, 0, (void*)1);
+
     #ifdef __APPLE__
     #else
     int i;
     for(i = 0; i != 64; i++) {
-        sprintf(dev_name + 10, "%i", i);
+        snprintf(dev_name + 10, sizeof(dev_name) - 10, "%i", i);
 
         struct stat st;
         if (-1 == stat(dev_name, &st)) {
@@ -1147,9 +1127,9 @@ void* video_detect(void)
         memcpy(p + sizeof(void*), dev_name, sizeof(dev_name));
         if(!first) {
             first = pp;
-            postmessage(NEW_VIDEO_DEVICE, 1, 0, p);
+            postmessage(NEW_VIDEO_DEVICE, UI_STRING_ID_INVALID, 1, p);
         } else {
-            postmessage(NEW_VIDEO_DEVICE, 0, 0, p);
+            postmessage(NEW_VIDEO_DEVICE, UI_STRING_ID_INVALID, 0, p);
         }
 
     }

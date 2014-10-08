@@ -36,6 +36,10 @@ _Bool doevent(XEvent event)
     }
 
     case FocusIn: {
+        if (xic) {
+            XSetICFocus(xic);
+        }
+
         havefocus = 1;
         XWMHints hints = {0};
         XSetWMHints(display, window, &hints);
@@ -43,6 +47,10 @@ _Bool doevent(XEvent event)
     }
 
     case FocusOut: {
+        if (xic) {
+            XUnsetICFocus(xic);
+        }
+
         havefocus = 0;
         break;
     }
@@ -266,6 +274,10 @@ _Bool doevent(XEvent event)
                     edit_char(KEY_DEL, 1, 0);
                     return 1;
                 }
+            }
+
+            if(sym == XK_KP_Enter){
+                sym = XK_Return;
             }
 
             if(sym == XK_Return && (ev->state & 1)) {

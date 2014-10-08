@@ -1,9 +1,39 @@
 #include "main.h"
 
-#include "ui_strings.h"
 #include "ui_edits.h"
 #include "ui_buttons.h"
 #include "ui_dropdown.h"
+
+// Application-wide language setting
+UI_LANG_ID LANG;
+
+/***** MAYBE_I18NAL_STRING helpers start *****/
+
+void maybe_i18nal_string_set_plain(MAYBE_I18NAL_STRING *mis, char_t *str, STRING_IDX length) {
+    mis->plain.str = str;
+    mis->plain.length = length;
+    mis->i18nal = UI_STRING_ID_INVALID;
+}
+
+void maybe_i18nal_string_set_i18nal(MAYBE_I18NAL_STRING *mis, UI_STRING_ID string_id) {
+    mis->plain.str = NULL;
+    mis->plain.length = 0;
+    mis->i18nal = string_id; 
+}
+
+STRING* maybe_i18nal_string_get(MAYBE_I18NAL_STRING *mis) {
+    if(mis->plain.str) {
+        return &mis->plain;
+    } else {
+        return SPTRFORLANG(LANG, mis->i18nal);
+    }
+}
+
+_Bool maybe_i18nal_string_is_valid(MAYBE_I18NAL_STRING *mis) {
+    return (mis->plain.str || ((UI_STRING_ID_INVALID != mis->i18nal) && (mis->i18nal <= STRS_MAX)));
+}
+
+/***** MAYBE_I18NAL_STRING helpers end *****/
 
 uint32_t status_color[] = {
     C_GREEN,
@@ -33,7 +63,7 @@ static void drawself(void)
     drawalpha(BM_ONLINE + status, SELF_STATUS_X + BM_STATUSAREA_WIDTH / 2 - BM_STATUS_WIDTH / 2, SELF_STATUS_Y + BM_STATUSAREA_HEIGHT / 2 - BM_STATUS_WIDTH / 2, BM_STATUS_WIDTH, BM_STATUS_WIDTH, status_color[status]);
 }
 
-static void drawfriend(int x, int y, int w, int height)
+static void drawfriend(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(height))
 {
     FRIEND *f = sitem->data;
 
@@ -48,7 +78,7 @@ static void drawfriend(int x, int y, int w, int height)
     drawtextrange(LIST_RIGHT + 30 * SCALE, width - 92 * SCALE, 16 * SCALE, f->status_message, f->status_length);
 }
 
-static void drawgroup(int x, int y, int w, int height)
+static void drawgroup(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(height))
 {
     GROUPCHAT *g = sitem->data;
 
@@ -64,10 +94,11 @@ static void drawgroup(int x, int y, int w, int height)
 
 
     setcolor(GRAY(150));
-    int i = 0, j = 0, k = LIST_RIGHT + 30 * SCALE;
+    uint32_t i = 0;
+    int k = LIST_RIGHT + 30 * SCALE;
     while(i < g->peers)
     {
-        uint8_t *name = g->peername[j];
+        uint8_t *name = g->peername[i];
         if(name)
         {
             uint8_t buf[134];
@@ -83,20 +114,25 @@ static void drawgroup(int x, int y, int w, int height)
             drawtext(k, 18 * SCALE, buf, name[0] + 2);
 
             k += w;
-            i++;
         }
-        j++;
+        i++;
     }
 }
 
-static void drawfriendreq(int x, int y, int width, int height)
+static void drawfriendreq(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(height))
 {
+    FRIENDREQ *req = sitem->data;
+
     setcolor(C_TITLE);
     setfont(FONT_SELF_NAME);
     drawstr(LIST_RIGHT + SCALE * 5, SCALE * 10, FRIENDREQUEST);
+
+    setcolor(LIST_MAIN);
+    setfont(FONT_STATUS);
+    drawtextrange(LIST_RIGHT + 5 * SCALE, width, 20 * SCALE, req->msg, req->length);
 }
 
-static void drawadd(int x, int y, int w, int height)
+static void drawadd(int UNUSED(x), int UNUSED(y), int UNUSED(w), int height)
 {
     setcolor(C_TITLE);
     setfont(FONT_SELF_NAME);
@@ -111,27 +147,57 @@ static void drawadd(int x, int y, int w, int height)
     if(addfriend_status) {
         setfont(FONT_MISC);
         setcolor(C_RED);
-        STRING *str = &strings[LANG][REQ_STRING_1 + addfriend_status - 1];
+
+        STRING *str;
+        switch(addfriend_status) {
+        case ADDF_SENT:
+            str = SPTR(REQ_SENT); break;
+        case ADDF_DISCOVER:
+            str = SPTR(REQ_RESOLVE); break;
+        case ADDF_BADNAME:
+            str = SPTR(REQ_INVALID_ID); break;
+        case ADDF_NONAME:
+            str = SPTR(REQ_EMPTY_ID); break;
+        case ADDF_TOOLONG: //if message length is too long.
+            str = SPTR(REQ_LONG_MSG); break;
+        case ADDF_NOMESSAGE: //if no message (message length must be >= 1 byte).
+            str = SPTR(REQ_NO_MSG); break;
+        case ADDF_OWNKEY: //if user's own key.
+            str = SPTR(REQ_SELF_ID); break;
+        case ADDF_ALREADYSENT: //if friend request already sent or already a friend.
+            str = SPTR(REQ_ALREADY_FRIENDS); break;
+        case ADDF_BADCHECKSUM: //if bad checksum in address.
+            str = SPTR(REQ_BAD_CHECKSUM); break;
+        case ADDF_SETNEWNOSPAM: //if the friend was already there but the nospam was different.
+            str = SPTR(REQ_BAD_NOSPAM); break;
+        case ADDF_NOMEM: //if increasing the friend list size fails.
+            str = SPTR(REQ_NO_MEMORY); break;
+        case ADDF_UNKNOWN: //for unknown error.
+        case ADDF_NONE: //this case must never be rendered, but if it does, assume it's an error
+        default:
+            str = SPTR(REQ_UNKNOWN); break;
+        }
+
         drawtextmultiline(LIST_RIGHT + SCALE * 5, width - BM_SBUTTON_WIDTH - 5 * SCALE, LIST_Y + SCALE * 83, 0, height, font_small_lineheight, str->str, str->length, 0xFFFF, 0, 1);
     }
 }
 
 
-static void drawsettings(int x, int y, int width, int height)
+static void drawsettings(int UNUSED(x), int UNUSED(y), int UNUSED(width), int UNUSED(height))
 {
     setcolor(C_TITLE);
     setfont(FONT_SELF_NAME);
     drawstr(LIST_RIGHT + SCALE * 5, SCALE * 10, USERSETTINGS);
 }
 
-static void drawtransfer(int x, int y, int width, int height)
+static void drawtransfer(int UNUSED(x), int UNUSED(y), int UNUSED(width), int UNUSED(height))
 {
     setcolor(C_TITLE);
     setfont(FONT_SELF_NAME);
     drawstr(LIST_RIGHT + SCALE * 5, SCALE * 10, SWITCHPROFILE);
 }
 
-static void drawsettings_content(int x, int y, int w, int height)
+static void drawsettings_content(int UNUSED(x), int y, int UNUSED(w), int UNUSED(height))
 {
     setcolor(C_TITLE);
     setfont(FONT_TEXT);
@@ -173,7 +239,7 @@ static void drawsettings_content(int x, int y, int w, int height)
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 302, WARNING);
 }
 
-static void background_draw(PANEL *p, int x, int y, int width, int height)
+static void background_draw(PANEL *UNUSED(p), int UNUSED(x), int UNUSED(y), int width, int height)
 {
     drawrect(0, 0, LIST_RIGHT, LIST_Y - 1, LIST_DARK);
     drawhline(0, LIST_Y - 1, LIST_RIGHT, LIST_EDGE);
@@ -192,32 +258,32 @@ static void background_draw(PANEL *p, int x, int y, int width, int height)
     drawhline(LIST_RIGHT + 1, LIST_Y - 1, width, C_GRAY);
 }
 
-static _Bool background_mmove(PANEL *p, int x, int y, int width, int height, int mx, int my, int dx, int dy)
+static _Bool background_mmove(PANEL *UNUSED(p), int UNUSED(x), int UNUSED(y), int UNUSED(width), int UNUSED(height), int UNUSED(mx), int UNUSED(my), int UNUSED(dx), int UNUSED(dy))
 {
     return 0;
 }
 
-static _Bool background_mdown(PANEL *p)
+static _Bool background_mdown(PANEL *UNUSED(p))
 {
     return 0;
 }
 
-static _Bool background_mright(PANEL *p)
+static _Bool background_mright(PANEL *UNUSED(p))
 {
     return 0;
 }
 
-static _Bool background_mwheel(PANEL *p, int height, double d)
+static _Bool background_mwheel(PANEL *UNUSED(p), int UNUSED(height), double UNUSED(d))
 {
     return 0;
 }
 
-static _Bool background_mup(PANEL *p)
+static _Bool background_mup(PANEL *UNUSED(p))
 {
     return 0;
 }
 
-static _Bool background_mleave(PANEL *p)
+static _Bool background_mleave(PANEL *UNUSED(p))
 {
     return 0;
 }
