@@ -1,11 +1,16 @@
 ## OPTIONS ##
 # set to anything else to disable DBUS
 DBUS = 1
+GTK = 1
 
 DEPS = fontconfig freetype2 libtoxav libtoxcore
 DEPS += libv4lconvert openal vpx x11 xext xrender
 ifeq ($(DBUS), 1)
 	DEPS += dbus-1
+endif
+
+ifeq ($(GTK), 1)
+	DEPS += gtk+-2.0
 endif
 
 UNAME_S := $(shell uname -s)
@@ -17,6 +22,10 @@ LDFLAGS += $(shell pkg-config --libs $(DEPS))
 
 ifneq ($(DBUS), 1)
 	CFLAGS += -DNO_DBUS
+endif
+
+ifneq ($(GTK), 1)
+	CFLAGS += -DNO_GTK
 endif
 
 ifeq ($(UNAME_S), Linux)

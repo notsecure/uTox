@@ -399,30 +399,30 @@ void openurl(char_t *str)
 
 void openfilesend(void)
 {
-    if(libgtk) {
+#ifndef NO_GTK
         gtk_openfilesend();
-    }
+#endif
 }
 
 void savefilerecv(uint32_t fid, MSG_FILE *file)
 {
-    if(libgtk) {
+#ifndef NO_GTK
         gtk_savefilerecv(fid, file);
-    } else {
+#else
         //fall back to working dir
         char *path = malloc(file->name_length + 1);
         memcpy(path, file->name, file->name_length);
         path[file->name_length] = 0;
 
         tox_postmessage(TOX_ACCEPTFILE, fid, file->filenumber, path);
-    }
+#endif
 }
 
 void savefiledata(MSG_FILE *file)
 {
-    if(libgtk) {
+#ifndef NO_GTK
         gtk_savefiledata(file);
-    } else {
+#else
         //fall back to working dir inline.png
         FILE *fp = fopen("inline.png", "wb");
         if(fp) {
@@ -433,7 +433,7 @@ void savefiledata(MSG_FILE *file)
             file->path = (uint8_t*)strdup("inline.png");
             file->inline_png = 0;
         }
-    }
+#endif
 }
 
 void setselection(char_t *data, STRING_IDX length)
@@ -847,11 +847,6 @@ int main(int argc, char *argv[])
     /* set the window name */
     XSetStandardProperties(display, window, "uTox", "uTox", None, argv, argc, None);
 
-    /* choose available libraries for optional UI stuff */
-    if(!(libgtk = gtk_load())) {
-        //try Qt
-    }
-
     /* initialize fontconfig */
     initfonts();
 
@@ -952,11 +947,6 @@ int main(int argc, char *argv[])
     toxaudio_postmessage(AUDIO_KILL, 0, 0, NULL);
     toxvideo_postmessage(VIDEO_KILL, 0, 0, NULL);
     tox_postmessage(TOX_KILL, 0, 0, NULL);
-
-    /* free client thread stuff */
-    if(libgtk) {
-
-    }
 
     Window root_return, child_return;
     int x_return, y_return;

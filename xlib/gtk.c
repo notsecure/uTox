@@ -1,24 +1,5 @@
-#ifdef __APPLE__
-#define LIBGTK_FILENAME "libgtk-x11-2.0.dylib"
-#else
-#define LIBGTK_FILENAME "libgtk-x11-2.0.so.0"
-#endif
 
-typedef struct
-{
-    void *data, *next;
-}g_list;
-
-void (*gtk_init)(int*, char***);
-_Bool (*gtk_events_pending)(void);
-void (*gtk_main_iteration)(void);
-void* (*gtk_file_chooser_dialog_new)(const char*, void*, int, const char*, ...);
-void (*gtk_file_chooser_set_select_multiple)(void*, _Bool);
-void (*gtk_file_chooser_set_current_name)(void*, char*);
-int (*gtk_dialog_run)(void*);
-void* (*gtk_file_chooser_get_filename)(void*);
-void* (*gtk_file_chooser_get_filenames)(void*);
-void (*gtk_widget_destroy)(void*);
+#include <gtk/gtk.h>
 
 volatile _Bool gtk_open;
 
@@ -31,7 +12,7 @@ static void gtk_openthread(void *args)
     int result = gtk_dialog_run(dialog);
     if(result == -3) {
         char *out = malloc(65536), *outp = out;
-        g_list *list = gtk_file_chooser_get_filenames(dialog), *p = list;
+        GSList *list = gtk_file_chooser_get_filenames(dialog), *p = list;
         while(p) {
             outp = stpcpy(outp, p->data);
             *outp++ = '\n';
