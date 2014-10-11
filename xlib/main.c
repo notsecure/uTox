@@ -87,9 +87,9 @@ XIC xic = NULL;
 
 XImage *screen_image;
 
-/* pointers to dynamically loaded libs */
-void *libgtk;
+#ifndef NO_GTK
 #include "gtk.c"
+#endif
 
 #include "freetype.c"
 
