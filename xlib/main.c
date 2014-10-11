@@ -850,6 +850,10 @@ int main(int argc, char *argv[])
     /* initialize fontconfig */
     initfonts();
 
+#ifndef NO_GTK
+    gtk_init(NULL, NULL);
+#endif
+
     /* load fonts and scalable bitmaps */
     ui_scale(save->scale + 1);
 
