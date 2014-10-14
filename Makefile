@@ -1,22 +1,32 @@
 ## OPTIONS ##
-# set to anything else to disable DBUS
+# set to anything else to disable them
 DBUS = 1
+V4LCONVERT = 1
 
 DEPS = fontconfig freetype2 libtoxav libtoxcore
-DEPS += libv4lconvert openal vpx x11 xext xrender
+DEPS += openal vpx x11 xext xrender
+
 ifeq ($(DBUS), 1)
 	DEPS += dbus-1
 endif
 
+ifeq ($(V4LCONVERT), 1)
+	DEPS += libv4lconvert
+endif
+
 UNAME_S := $(shell uname -s)
 
-CFLAGS += -g -Wall -pthread -std=gnu99
+CFLAGS += -g -Wall -Wshadow -pthread -std=gnu99
 CFLAGS += $(shell pkg-config --cflags $(DEPS))
 LDFLAGS = -pthread -lm
 LDFLAGS += $(shell pkg-config --libs $(DEPS))
 
 ifneq ($(DBUS), 1)
 	CFLAGS += -DNO_DBUS
+endif
+
+ifneq ($(V4LCONVERT), 1)
+	CFLAGS += -DNO_V4LCONVERT
 endif
 
 ifeq ($(UNAME_S), Linux)

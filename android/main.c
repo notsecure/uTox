@@ -60,9 +60,9 @@ void postmessage(uint32_t msg, uint16_t param1, uint16_t param2, void *data)
     write(pipefd[1], &piping, sizeof(PIPING));
 }
 
-void drawimage(void *data, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position)
+void drawimage(UTOX_NATIVE_IMAGE data, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position)
 {
-    GLuint texture = (size_t)data;
+    GLuint texture = data;
 
     if(!zoom && width > maxwidth) {
         makequad(&quads[0], x, y, x + maxwidth, y + (height * maxwidth / width));
@@ -133,20 +133,20 @@ void setselection(char_t *data, STRING_IDX length)
 {
 }
 
-void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size)
+UTOX_NATIVE_IMAGE png_to_image(UTOX_PNG_IMAGE data, size_t size, uint16_t *w, uint16_t *h)
 {
     uint8_t *out;
     unsigned width, height;
-    unsigned r = lodepng_decode24(&out, &width, &height, data, size);
+    unsigned r = lodepng_decode24(&out, &width, &height, data->png_data, size);
     //free(data);
 
     if(r != 0 || !width || !height) {
-        return NULL;
+        return 0;
     }
 
     *w = width;
     *h = height;
-    GLuint texture;
+    GLuint texture = 0;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -154,7 +154,7 @@ void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, out);
     free(out);
 
-    return (void*)(size_t)texture;
+    return texture;
 }
 
 void* loadsavedata(uint32_t *len)
@@ -181,6 +181,13 @@ int datapath_old(uint8_t *dest)
 int datapath(uint8_t *dest)
 {
     return 0;
+}
+
+void flush_file(FILE *file)
+{
+    fflush(file);
+    int fd = fileno(file);
+    fsync(fd);
 }
 
 void setscale(void)
@@ -298,8 +305,8 @@ static _Bool init_display(void)
     eglQuerySurface(display, surface, EGL_WIDTH, &w);
     eglQuerySurface(display, surface, EGL_HEIGHT, &h);
 
-    width = w;
-    height = h;
+    utox_window_width = w;
+    utox_window_height = h;
 
     return gl_init();
 }
@@ -483,7 +490,7 @@ static void android_main(void) /* main thread */
                         case AMOTION_EVENT_ACTION_POINTER_DOWN: {
                             lx = x;
                             ly = y;
-                            panel_mmove(&panel_main, 0, 0, width, height, x, y, 0, 0);
+                            panel_mmove(&panel_main, 0, 0, utox_window_width, utox_window_height, x, y, 0, 0);
                             panel_mdown(&panel_main);
                             //pointer[pointer_index].down = true;
                             //pointer[pointer_index].x = x;
@@ -509,7 +516,7 @@ static void android_main(void) /* main thread */
                         }
 
                         case AMOTION_EVENT_ACTION_MOVE: {
-                            panel_mmove(&panel_main, 0, 0, width, height, x, y, x - lx, y - ly);
+                            panel_mmove(&panel_main, 0, 0, utox_window_width, utox_window_height, x, y, x - lx, y - ly);
                             lx = x;
                             ly = y;
                             //pointer[pointer_index].x = x;
@@ -621,27 +628,27 @@ static void android_main(void) /* main thread */
             eglQuerySurface(display, surface, EGL_WIDTH, &new_width);
             eglQuerySurface(display, surface, EGL_HEIGHT, &new_height);
 
-            if(new_width != width || new_height != height) {
-                width = new_width;
-                height = new_height;
+            if(new_width != utox_window_width || new_height != utox_window_height) {
+                utox_window_width = new_width;
+                utox_window_height = new_height;
 
                 float vec[4];
-                vec[0] = -(float)width / 2.0;
-                vec[1] = -(float)height / 2.0;
-                vec[2] = 2.0 / (float)width;
-                vec[3] = -2.0 / (float)height;
+                vec[0] = -(float)utox_window_width / 2.0;
+                vec[1] = -(float)utox_window_height / 2.0;
+                vec[2] = 2.0 / (float)utox_window_width;
+                vec[3] = -2.0 / (float)utox_window_height;
                 glUniform4fv(matrix, 1, vec);
 
-                ui_size(width, height);
+                ui_size(utox_window_width, utox_window_height);
 
-                glViewport(0, 0, width, height);
+                glViewport(0, 0, utox_window_width, utox_window_height);
 
                 _redraw = 1;
             }
 
             if(_redraw) {
                 _redraw = 0;
-                panel_draw(&panel_main, 0, 0, width, height);
+                panel_draw(&panel_main, 0, 0, utox_window_width, utox_window_height);
             }
         }
 
@@ -686,7 +693,7 @@ static void onContentRectChanged(ANativeActivity* activity, const ARect* r)
     rect = *r;
     debug("rect: %u %u %u %u\n", rect.left, rect.right, rect.top, rect.bottom);
 
-    baseline = rect.bottom;
+    utox_window_baseline = rect.bottom;
     _redraw = 1;
 }
 

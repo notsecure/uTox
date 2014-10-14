@@ -36,7 +36,8 @@ static void button_videopreview_onpress(void)
         video_end(0);
         toxvideo_postmessage(VIDEO_PREVIEW_END, 0, 0, NULL);
     } else if(video_width) {
-        video_begin(0, (char_t*)"Video Preview", sizeof("Video Preview") - 1, video_width, video_height);
+        STRING *s = SPTR(WINDOW_TITLE_VIDEO_PREVIEW);
+        video_begin(0, s->str, s->length, video_width, video_height);
         toxvideo_postmessage(VIDEO_PREVIEW_START, 0, 0, NULL);
         video_preview = 1;
     }
@@ -373,7 +374,7 @@ button_copyid = {
     .c1 = C_GREEN,
     .c2 = C_GREEN_LIGHT,
     .c3 = C_GREEN_LIGHT,
-    .str = "Copy",
+    .button_text = { .i18nal = STR_COPY_TOX_ID },
 
     .onpress = button_copyid_onpress,
 },
@@ -383,7 +384,7 @@ button_addfriend = {
     .c1 = C_GREEN,
     .c2 = C_GREEN_LIGHT,
     .c3 = C_GREEN_LIGHT,
-    .str = "Add",
+    .button_text = { .i18nal = STR_BUTTON_ADD_FRIEND },
 
     .onpress = button_addfriend_onpress,
 },
@@ -433,7 +434,7 @@ button_acceptfriend = {
     .c1 = C_GREEN,
     .c2 = C_GREEN_LIGHT,
     .c3 = C_GREEN_LIGHT,
-    .str = "Add",
+    .button_text = { .i18nal = STR_BUTTON_ACCEPT_FRIEND },
 
     .onpress = button_acceptfriend_onpress,
 },

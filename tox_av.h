@@ -142,6 +142,8 @@ static void video_thread(void *args)
     _Bool video_on = 0;
     _Bool call[MAX_CALLS] = {0}, preview = 0, newinput = 1;
 
+    // Add always-present null video input device.
+    postmessage(NEW_VIDEO_DEVICE, STR_VIDEO_IN_NONE, 1, NULL);
 
     video_device = video_detect();
     if(video_device) {
@@ -251,7 +253,7 @@ static void video_thread(void *args)
                 int i;
                 for(i = 0; i < MAX_CALLS; i++) {
                     if(call[i]) {
-                        int r, len;
+                        int rr, len;
                         if((len = toxav_prepare_video_frame(av, i, lbuffer, sizeof(lbuffer), &input)) < 0) {
                             debug("toxav_prepare_video_frame error %i\n", len);
                             continue;
@@ -259,8 +261,8 @@ static void video_thread(void *args)
 
                         debug("%u\n", len);
 
-                        if((r = toxav_send_video(av, i, (void*)lbuffer, len)) < 0) {
-                            debug("toxav_send_video error %i %s\n", r, strerror(errno));
+                        if((rr = toxav_send_video(av, i, (void*)lbuffer, len)) < 0) {
+                            debug("toxav_send_video error %i %s\n", rr, strerror(errno));
                         }
                     }
                 }
@@ -406,12 +408,12 @@ static void audio_thread(void *args)
         debug("Input Device List:\n");
         while(*device_list) {
             printf("%s\n", device_list);
-            postmessage(NEW_AUDIO_IN_DEVICE, 0, 0, (void*)device_list);
+            postmessage(NEW_AUDIO_IN_DEVICE, UI_STRING_ID_INVALID, 0, (void*)device_list);
             device_list += strlen(device_list) + 1;
         }
     }
 
-    postmessage(NEW_AUDIO_IN_DEVICE, 0, 1, "None");
+    postmessage(NEW_AUDIO_IN_DEVICE, STR_AUDIO_IN_NONE, 0, NULL);
     audio_detect();
 
     device_list = alcGetString(NULL, ALC_ALL_DEVICES_SPECIFIER);

@@ -232,6 +232,9 @@ msgstr("None")
 msgid(VIDEO_IN_DESKTOP)
 msgstr("Desktop")
 
+msgid(AUDIO_IN_DEFAULT_LOOPBACK)
+msgstr("Default Loopback")
+
 msgid(DEFAULT_FRIEND_REQUEST_MESSAGE)
 msgstr("Please accept this friend request.")
 
@@ -243,4 +246,7 @@ msgstr("IP")
 
 msgid(PROXY_EDIT_HINT_PORT)
 msgstr("Port")
+
+msgid(WINDOW_TITLE_VIDEO_PREVIEW)
+msgstr("Video Preview")
 

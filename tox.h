@@ -16,7 +16,10 @@ enum {
     TOX_DELFRIEND,
     TOX_ACCEPTFRIEND,
     TOX_SENDMESSAGE,
+    TOX_SENDACTION,
     TOX_SENDMESSAGEGROUP,
+    TOX_SENDACTIONGROUP,
+    TOX_SET_TYPING,
     TOX_CALL,
     TOX_CALL_VIDEO,
     TOX_CALL_VIDEO_ON,
@@ -36,6 +39,11 @@ enum {
     TOX_FILE_OUT_PAUSE,
     TOX_FILE_IN_RESUME,
     TOX_FILE_OUT_RESUME,
+};
+
+struct TOX_SEND_INLINE_MSG {
+    size_t image_size;
+    UTOX_PNG_IMAGE image;
 };
 
 /* toxav thread messages (sent from the client thread)

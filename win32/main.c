@@ -40,6 +40,8 @@ extern const CLSID CLSID_NullRenderer;
 
 #include <shlobj.h>
 
+#include <io.h>
+
 #undef CLEARTYPE_QUALITY
 #define CLEARTYPE_QUALITY 5
 
@@ -145,7 +147,7 @@ void drawalpha(int bm, int x, int y, int width, int height, uint32_t color)
     DeleteObject(temp);
 }
 
-void drawimage(void *data, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position)
+void drawimage(UTOX_NATIVE_IMAGE data, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position)
 {
     HBITMAP bm = data;
     SelectObject(hdcMem, bm);
@@ -437,7 +439,7 @@ void savefiledata(MSG_FILE *file)
     if(GetSaveFileName(&ofn)) {
         FILE *fp = fopen(path, "wb");
         if(fp) {
-            fwrite(file->path + ((file->flags & 1) ? 4 : 0), file->size, 1, fp);
+            fwrite(file->path, file->size, 1, fp);
             fclose(fp);
 
             free(file->path);
@@ -619,13 +621,7 @@ static void sendbitmap(HDC mem, HBITMAP hbm, int width, int height)
     lodepng_encode_memory(&out, &size, bits, width, height, LCT_RGB, 8);
     free(bits);
 
-    uint32_t s = size;
-    void *data = malloc(size + 4);
-    memcpy(data, &s, 4);
-    memcpy(data + 4, out, size);
-    free(out);
-
-    friend_sendimage(sitem->data, hbm, data, width, height);
+    friend_sendimage(sitem->data, hbm, width, height, (UTOX_PNG_IMAGE)out, size);
 }
 
 void copy(int value)
@@ -690,11 +686,11 @@ void paste(void)
     CloseClipboard();
 }
 
-void* png_to_image(void *data, uint16_t *w, uint16_t *h, uint32_t size)
+UTOX_NATIVE_IMAGE png_to_image(UTOX_PNG_IMAGE data, size_t size, uint16_t *w, uint16_t *h)
 {
     uint8_t *out;
     unsigned width, height;
-    unsigned r = lodepng_decode32(&out, &width, &height, data, size);
+    unsigned r = lodepng_decode32(&out, &width, &height, data->png_data, size);
     //free(data);
 
     if(r != 0 || !width || !height) {
@@ -757,6 +753,13 @@ int datapath(uint8_t *dest)
     return 0;
 }
 
+void flush_file(FILE *file)
+{
+    fflush(file);
+    int fd = _fileno(file);
+    _commit(fd);
+}
+
 void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length)
 {
     if(havefocus) {
@@ -788,7 +791,7 @@ void showkeyboard(_Bool show)
 
 void redraw(void)
 {
-    panel_draw(&panel_main, 0, 0, width, height);
+    panel_draw(&panel_main, 0, 0, utox_window_width, utox_window_height);
 }
 
 static int grabx, graby, grabpx, grabpy;
@@ -1055,9 +1058,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
 
     hdc_brush = GetStockObject(DC_BRUSH);
 
-    list_dropdown_add_localized(&dropdown_video, STR_VIDEO_IN_NONE, NULL);
-    list_dropdown_add_localized(&dropdown_video, STR_VIDEO_IN_DESKTOP, (void*)1);
-
     ShowWindow(hwnd, nCmdShow);
 
     tme.hwndTrack = hwnd;
@@ -1176,12 +1176,12 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_SIZE: {
         switch(wParam) {
         case SIZE_MAXIMIZED: {
-            maximized = 1;
+            utox_window_maximized = 1;
             break;
         }
 
         case SIZE_RESTORED: {
-            maximized = 0;
+            utox_window_maximized = 0;
             break;
         }
         }
@@ -1197,8 +1197,8 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
             w = r.right;
             h = r.bottom;
 
-            width = w;
-            height = h;
+            utox_window_width = w;
+            utox_window_height = h;
 
             debug("%u %u\n", w, h);
 
@@ -1209,7 +1209,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
                 DeleteObject(hdc_bm);
             }
 
-            hdc_bm = CreateCompatibleBitmap(main_hdc, width, height);
+            hdc_bm = CreateCompatibleBitmap(main_hdc, utox_window_width, utox_window_height);
             SelectObject(hdc, hdc_bm);
             redraw();
         }
@@ -1308,7 +1308,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
     }
 
     case WM_MOUSEWHEEL: {
-        panel_mwheel(&panel_main, 0, 0, width, height, (double)((int16_t)HIWORD(wParam)) / (double)(WHEEL_DELTA));
+        panel_mwheel(&panel_main, 0, 0, utox_window_width, utox_window_height, (double)((int16_t)HIWORD(wParam)) / (double)(WHEEL_DELTA));
         return 0;
     }
 
@@ -1324,7 +1324,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         my = y;
 
         cursor = 0;
-        panel_mmove(&panel_main, 0, 0, width, height, x, y, dx, dy);
+        panel_mmove(&panel_main, 0, 0, utox_window_width, utox_window_height, x, y, dx, dy);
 
         SetCursor(cursors[cursor]);
 
@@ -1344,7 +1344,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         y = GET_Y_LPARAM(lParam);
 
         if(x != mx || y != my) {
-            panel_mmove(&panel_main, 0, 0, width, height, x, y, x - mx, y - my);
+            panel_mmove(&panel_main, 0, 0, utox_window_width, utox_window_height, x, y, x - mx, y - my);
             mx = x;
             my = y;
         }
@@ -1750,6 +1750,9 @@ IBaseFilter *pNullF = NULL;
 
 void* video_detect(void)
 {
+    // Indicate that we support desktop capturing.
+    postmessage(NEW_VIDEO_DEVICE, STR_VIDEO_IN_DESKTOP, 0, (void*)1);
+
     max_video_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
     max_video_height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
@@ -1848,7 +1851,7 @@ void* video_detect(void)
                 void *data = malloc(sizeof(void*) + len * 3 / 2);
                 WideCharToMultiByte(CP_UTF8, 0, varName.bstrVal, -1, data + sizeof(void*), len * 3 / 2, NULL, 0);
                 memcpy(data, &temp, sizeof(pFilter));
-                postmessage(NEW_VIDEO_DEVICE, 0, 0, data);
+                postmessage(NEW_VIDEO_DEVICE, UI_STRING_ID_INVALID, 1, data);
             }
 
             // Now add the filter to the graph.

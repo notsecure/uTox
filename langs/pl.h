@@ -255,3 +255,11 @@ msgstr("Ekran")
 //msgid(PROXY_EDIT_HINT_PORT)
 //msgstr("Port")
 
+//TODO: Localize or remove.
+//msgid(AUDIO_IN_DEFAULT_LOOPBACK)
+//msgstr("Default Loopback")
+
+//TODO: Localize or remove.
+//msgid(WINDOW_TITLE_VIDEO_PREVIEW)
+//msgstr("Video Preview")
+
