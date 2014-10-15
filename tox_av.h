@@ -559,6 +559,15 @@ static void audio_thread(void *args)
 
             case AUDIO_PLAY_RINGTONE:
                 {
+                    if(!audible_notifications_enabled)
+                    {
+                         debug("audible_notifications_enabled is false\n");
+                        break;
+                    }
+                    else
+                    {
+                         debug("audible_notifications_enabled is true\n");
+                    }
 
                     int errorLoadingWave=0;
                    // ALCdevice *dev = NULL;
