@@ -559,191 +559,58 @@ static void audio_thread(void *args)
 
             case AUDIO_PLAY_RINGTONE:
                 {
-                    if(!audible_notifications_enabled)
-                    {
-                         debug("audible_notifications_enabled is false\n");
+
+                     if(!audible_notifications_enabled)
+                     {
                         break;
-                    }
-                    else
-                    {
-                         debug("audible_notifications_enabled is true\n");
-                    }
+                     }
 
-                    int errorLoadingWave=0;
-                   // ALCdevice *dev = NULL;
-                   // ALCcontext *ctx = NULL;
-
-                   // const char *defname = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
 
                     /* Create buffer to store samples */
-                    ALuint buf2;
-                    alGenBuffers(1, &buf2);
-                    //al_check_error();
+                    ALuint RingBuffer;
+                    alGenBuffers(1, &RingBuffer);
 
-                    /* Fill buffer with Sine-Wave */
-                    float freq1 = 441.f;
-                    float freq2 = 882.f;
-                    //float freq=40.f;
+
+                    float frequency1 = 441.f;
+                    float frequency2 = 882.f;
                     int seconds = 10.0;
                     unsigned sample_rate = 22050;
-
                     size_t buf_size = seconds * sample_rate *2; //16 bit (2 bytes per sample)
-
-                    short *samples;
+                    short *samples=0;
                     samples = (short*)malloc(buf_size*sizeof(short));
-                    int ii=0;
-                    for( ii=0; ii<buf_size; ++ii)
+
+
+                    /*Generate an electronic ringer sound that quickly alternates between two frequencies*/
+                    int index=0;
+                    for(index=0; index<buf_size; ++index)
                     {
-                        if((ii/1000)%2==1 )
+                        if((index/1000)%2==1 )
                         {
-                            samples[ii] = 15000 * sin( (2.0*3.1415926*freq1)/sample_rate * ii ); //15000=volume lvl. It can be from zero to 32700
+                            samples[index] = 5000 * sin( (2.0*3.1415926*frequency1)/sample_rate * index ); //5000=amplitude(volume level). It can be from zero to 32700
 
                         }
                         else
                         {
-                            samples[ii] = 15000 * sin( (2.0*3.1415926*freq2)/sample_rate * ii );
+                            samples[index] = 5000 * sin( (2.0*3.1415926*frequency2)/sample_rate * index );
                         }
                     }
 
 
-                    //Variables to store info about the WAVE file (all of them is not needed for OpenAL)
-                    char type[4];
-                    unsigned int size,chunkSize;
-                    short formatType,channels;
-                    unsigned int sampleRate,avgBytesPerSec;
-                    short bytesPerSample,bitsPerSample;
-                    unsigned int dataSize;
-                    ALenum format=0;
-
-
-                    do //a run once "loop" that we can break out of if we need to.
-                    {
-
-                        debug("Lets read a wave and play it as a ring tone\n");
-                        FILE *fp = NULL;                                                            //Create FILE pointer for the WAVE file
-                        system("pwd");
-                        fp=fopen("ring.wav","rb");                                            //Open the WAVE file
-                        if (!fp)
-                        {
-                            //  return endWithError("Failed to open file");                        //Could not open file
-                            debug("Failed to open file\n");
-                            errorLoadingWave=1;
-                            break;
-                        }
-
-
-
-                        //Check that the WAVE file is OK
-                        fread(type,sizeof(char),4,fp);                                              //Reads the first bytes in the file
-                        if(type[0]!='R' || type[1]!='I' || type[2]!='F' || type[3]!='F')             //Should be "RIFF"
-                        {
-                            debug("No RIFF");
-                            errorLoadingWave=1;
-                            break;
-                        }
-                        else
-                            debug("RIFF is Good\n");
-                        fread(&size, sizeof(unsigned int),1,fp);                                           //Continue to read the file
-                        fread(type, sizeof(char),4,fp);                                             //Continue to read the file
-                        if (type[0]!='W' || type[1]!='A' || type[2]!='V' || type[3]!='E')           //This part should be "WAVE"
-                        {
-                            // return endWithError("not WAVE");                                            //Not WAVE
-                            debug("not WAVE\n");
-                            errorLoadingWave=1;
-                            break;
-                        }
-
-                        fread(type,sizeof(char),4,fp);                                              //Continue to read the file
-                        if (type[0]!='f' || type[1]!='m' || type[2]!='t' || type[3]!=' ')           //This part should be "fmt "
-                        {
-                            debug("not fmt\n");
-                            errorLoadingWave=1;
-                            break;
-                        }
-                        //Now we know that the file is a acceptable WAVE file
-                        //Info about the WAVE data is now read and stored
-
-                        fread(&chunkSize,sizeof(unsigned int),1,fp);
-                        fread(&formatType,sizeof(short),1,fp);
-                        fread(&channels,sizeof(short),1,fp);
-                        fread(&sampleRate,sizeof(unsigned int),1,fp);
-                        fread(&avgBytesPerSec,sizeof(unsigned int),1,fp);
-                        fread(&bytesPerSample,sizeof(short),1,fp);
-                        fread(&bitsPerSample,sizeof(short),1,fp);
-
-                        fread(type,sizeof(char),4,fp);
-                        if (type[0]!='d' || type[1]!='a' || type[2]!='t' || type[3]!='a')           //This part should be "data"
-                        {
-                            debug("Missing DATA\n");
-                            errorLoadingWave=1;
-                            break;
-                        }
-
-                        fread(&dataSize,sizeof(unsigned int),1,fp);                                        //The size of the sound data is read
-
-
-                        if(bitsPerSample == 8)
-                        {
-                            if(channels == 1)
-                                format = AL_FORMAT_MONO8;
-                            else if(channels == 2)
-                                format = AL_FORMAT_STEREO8;
-                        }
-                        else if(bitsPerSample == 16)
-                        {
-                            if(channels == 1)
-                                format = AL_FORMAT_MONO16;
-                            else if(channels == 2)
-                                format = AL_FORMAT_STEREO16;
-                        }
-                        if(!format)
-                        {
-                            debug("Wrong BitPerSample\n");         //Not valid format
-                            errorLoadingWave=1;
-                            break;
-                        }
-
-                        if(samples)
-                            free(samples);
-                        samples= malloc(dataSize);                           //Allocate memory for the sound data
-                        fread(samples,sizeof(unsigned char),dataSize,fp);   //number of bytes loaded.
-                        debug("closing file pointer\n");
-                        fclose(fp);
-
-
-                    }
-                    while(1==2); //end of run once do while "loop"
-
-                    if(errorLoadingWave)
-                    {
-                        alBufferData(buf2, AL_FORMAT_MONO16, samples, buf_size, sample_rate);
-
-                    }
-                    else
-                    {
-                        alBufferData(buf2, format, samples, dataSize, sampleRate);
-                    }
-
-
-
-                    //PLAY
-                    /* Set-up sound source and play buffer */
-                   // ALuint ringSrc = 0;
-                   // alGenSources(1, &ringSrc);
-                    alSourcei(ringSrc, AL_BUFFER, buf2);
+                    alBufferData(RingBuffer, AL_FORMAT_MONO16, samples, buf_size, sample_rate);
+                    alSourcei(ringSrc, AL_BUFFER, RingBuffer);
                     alSourcePlay(ringSrc);
                     if(samples)
-                    free(samples);
+                        free(samples);
                     break;
                 }
-                 case AUDIO_STOP_RINGTONE:
+
+
+            case AUDIO_STOP_RINGTONE:
                 {
                     ALint state;
                     alGetSourcei(ringSrc, AL_SOURCE_STATE, &state);
-                    //if (state!=AL_PLAYING)
-                   // alSourcePlay(source);
                     if(state==AL_PLAYING)
-                    alSourceStop(ringSrc);
+                        alSourceStop(ringSrc);
                     break;
                 }
 
