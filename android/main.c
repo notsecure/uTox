@@ -721,8 +721,4 @@ __attribute__ ((externally_visible)) void ANativeActivity_onCreate(ANativeActivi
     pthread_create(&thread, &myattr, (void*(*)(void*))android_main, NULL);
 }
 
-
-void playringtone()
-{
-
-}
+void playringtone(){}

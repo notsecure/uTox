@@ -36,7 +36,8 @@ typedef struct
     uint8_t version, scale, enableipv6, disableudp;
     uint16_t window_x, window_y, window_width, window_height;
     uint16_t proxy_port;
-    uint8_t proxyenable, logging_enabled, audible_notifications_enabled;
+    uint8_t proxyenable, logging_enabled;
+    uint8_t audible_notifications_enabled;
     uint8_t proxy_ip[0];
 }UTOX_SAVE;
 
