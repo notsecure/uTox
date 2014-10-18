@@ -584,14 +584,22 @@ static void audio_thread(void *args)
                     int index=0;
                     for(index=0; index<buf_size; ++index)
                     {
-                        if((index/1000)%2==1 )
+                        //if( ( index/(sample_rate ))%2==0 )
+                          if(( index/(sample_rate )) %4<2 )
                         {
-                            samples[index] = 5000 * sin( (2.0*3.1415926*frequency1)/sample_rate * index ); //5000=amplitude(volume level). It can be from zero to 32700
+                            if((index/1000)%2==1 )
+                            {
+                                samples[index] = 5000 * sin( (2.0*3.1415926*frequency1)/sample_rate * index ); //5000=amplitude(volume level). It can be from zero to 32700
 
+                            }
+                            else
+                            {
+                                samples[index] = 5000 * sin( (2.0*3.1415926*frequency2)/sample_rate * index );
+                            }
                         }
                         else
                         {
-                            samples[index] = 5000 * sin( (2.0*3.1415926*frequency2)/sample_rate * index );
+                            samples[index]=0;
                         }
                     }
 
