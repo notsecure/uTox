@@ -2121,3 +2121,13 @@ _Bool video_endread(void)
     }
     return 1;
 }
+
+void playringtone()
+{
+    toxaudio_postmessage(AUDIO_PLAY_RINGTONE, 0, 0, NULL);
+}
+
+void stopringtone()
+{
+    toxaudio_postmessage(AUDIO_STOP_RINGTONE, 0, 0, NULL);
+}

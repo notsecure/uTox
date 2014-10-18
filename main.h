@@ -37,6 +37,7 @@ typedef struct
     uint16_t window_x, window_y, window_width, window_height;
     uint16_t proxy_port;
     uint8_t proxyenable, logging_enabled;
+    uint8_t audible_notifications_enabled;
     uint8_t proxy_ip[0];
 }UTOX_SAVE;
 
@@ -99,6 +100,8 @@ _Bool tox_connected;
 _Bool audio_preview, video_preview;
 
 volatile _Bool logging_enabled;
+
+volatile _Bool audible_notifications_enabled;
 
 #define MAX_NUM_FRIENDS 256
 
@@ -307,6 +310,8 @@ ToxAv* global_av;
 void audio_play(int32_t call_index, const int16_t *data, int length, uint8_t channels);
 void audio_begin(int32_t call_index);
 void audio_end(int32_t call_index);
+void playringtone();
+void stopringtone();
 
 #define drawstr(x, y, i) drawtext(x, y, S(i), SLEN(i))
 #define drawstr_getwidth(x, y, str) drawtext_getwidth(x, y, (char_t*)str, sizeof(str) - 1)

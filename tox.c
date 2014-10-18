@@ -1024,13 +1024,17 @@ static void call_notify(FRIEND *f, uint8_t status)
     switch(status) {
     case CALL_INVITED:
     case CALL_INVITED_VIDEO:
-        str = SPTR(CALL_INVITED); break;
+        str = SPTR(CALL_INVITED);
+        playringtone();
+        break;
     case CALL_RINGING:
     case CALL_RINGING_VIDEO:
         str = SPTR(CALL_RINGING); break;
     case CALL_OK:
     case CALL_OK_VIDEO:
-        str = SPTR(CALL_STARTED); break;
+        str = SPTR(CALL_STARTED);
+         stopringtone();
+        break;
     case CALL_NONE:
     default: //render unknown status as "call cancelled"
         str = SPTR(CALL_CANCELLED); break;

@@ -1251,3 +1251,13 @@ int video_getframe(vpx_image_t *image)
 
     return v4l_getframe(image);
 }
+
+void playringtone()
+{
+	toxaudio_postmessage(AUDIO_PLAY_RINGTONE, 0, 0, NULL);
+}
+
+void stopringtone()
+{
+	toxaudio_postmessage(AUDIO_STOP_RINGTONE, 0, 0, NULL);
+}
