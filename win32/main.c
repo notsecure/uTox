@@ -94,8 +94,6 @@ enum
     TRAY_STATUS_BUSY,
 };
 
-
-
 static int utf8tonative(char_t *str, wchar_t *out, int length)
 {
     return MultiByteToWideChar(CP_UTF8, 0, (char*)str, length, out, length);
@@ -2131,5 +2129,5 @@ void playringtone()
 
 void stopringtone()
 {
-    toxaudio_postmessage(AUDIO_STOP_RINGTONE, 0, 0, NULL);	
+    toxaudio_postmessage(AUDIO_STOP_RINGTONE, 0, 0, NULL);
 }

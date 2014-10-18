@@ -206,9 +206,11 @@ msgstr("keine")
 msgid(CONTACTS_FILTER_EDIT_HINT)
 msgstr("Freunde suchen")
 
-msgid(AUDIO_IN_DEFAULT_LOOPBACK)
-msgstr("Standard Loopback")
+//TODO: Localize or remove.
+//msgid(AUDIO_IN_DEFAULT_LOOPBACK)
+//msgstr("Default Loopback")
 
-msgid(WINDOW_TITLE_VIDEO_PREVIEW)
-msgstr("Video Vorschau")
+//TODO: Localize or remove.
+//msgid(WINDOW_TITLE_VIDEO_PREVIEW)
+//msgstr("Video Preview")
 

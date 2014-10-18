@@ -584,8 +584,7 @@ static void audio_thread(void *args)
                     int index=0;
                     for(index=0; index<buf_size; ++index)
                     {
-                        //if( ( index/(sample_rate ))%2==0 )
-                          if(( index/(sample_rate )) %4<2 )
+                        if(( index/(sample_rate )) %4<2 )//4 second ring cycle, first 2 secondsring, the rest(2 seconds) is silence
                         {
                             if((index/1000)%2==1 )
                             {
@@ -711,8 +710,7 @@ static void audio_thread(void *args)
 void toxaudio_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
 {
     switch(msg) {
-    case AUDIO_SET_INPUT: {
-        ;
+    case AUDIO_SET_INPUT: {;
         break;
     }
 
@@ -780,6 +778,3 @@ static void set_av_callbacks(ToxAv *av)
     toxav_register_audio_recv_callback(av, callback_av_audio, NULL);
     toxav_register_video_recv_callback(av, callback_av_video, NULL);
 }
-
-
-

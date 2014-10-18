@@ -18,7 +18,7 @@ void maybe_i18nal_string_set_plain(MAYBE_I18NAL_STRING *mis, char_t *str, STRING
 void maybe_i18nal_string_set_i18nal(MAYBE_I18NAL_STRING *mis, UI_STRING_ID string_id) {
     mis->plain.str = NULL;
     mis->plain.length = 0;
-    mis->i18nal = string_id;
+    mis->i18nal = string_id; 
 }
 
 STRING* maybe_i18nal_string_get(MAYBE_I18NAL_STRING *mis) {
