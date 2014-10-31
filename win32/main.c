@@ -791,6 +791,9 @@ void redraw(void)
 {
     panel_draw(&panel_main, 0, 0, utox_window_width, utox_window_height);
 }
+void force_redraw(void) {
+    redraw();
+}
 
 static int grabx, graby, grabpx, grabpy;
 static _Bool grabbing;

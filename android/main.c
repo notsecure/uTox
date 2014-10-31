@@ -443,6 +443,10 @@ void redraw(void)
 {
     _redraw = 1;
 }
+void force_redraw(void)
+{
+    redraw();
+}
 
 static void android_main(void) /* main thread */
 {
