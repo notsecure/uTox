@@ -95,6 +95,7 @@ typedef struct edit_change EDIT_CHANGE;
 #include "button.h"
 #include "dropdown.h"
 #include "contextmenu.h"
+#include "tooltip.h"
 
 #include "text.h"
 #include "util.h"
@@ -222,6 +223,7 @@ void drawimage(UTOX_NATIVE_IMAGE, int x, int y, int width, int height, int maxwi
 UTOX_NATIVE_IMAGE png_to_image(UTOX_PNG_IMAGE, size_t png_size, uint16_t *w, uint16_t *h);
 void showkeyboard(_Bool show);
 void redraw(void);
+void force_redraw(void); // TODO: as parameter for redraw()?
 
 int datapath_old(uint8_t *dest);
 int datapath(uint8_t *dest);

@@ -443,6 +443,10 @@ void redraw(void)
 {
     _redraw = 1;
 }
+void force_redraw(void)
+{
+    redraw();
+}
 
 void config_osdefaults(UTOX_SAVE *r)
 {
