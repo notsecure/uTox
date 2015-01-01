@@ -1,5 +1,4 @@
 *.o
 utox
 utox.exe
-bin/
-lib/
+
