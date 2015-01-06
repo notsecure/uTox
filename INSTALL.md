@@ -1,13 +1,13 @@
 # Install
 
-- [Unix like](#unix)
+- [GNU/Linux (Unix-like)](#unix)
 - [OS X](#osx)
 - [Windows](#windows)
 - [Android](#android)
 - [Binaries](#binaries)
 
 <a name="unix" />
-## Linux / Unix-like
+## GNU/Linux (Unix-like)
 
 Dependencies:
 
@@ -103,7 +103,7 @@ jarsigner -sigalg SHA1withRSA -digestalg SHA1 -keystore ./tmp/debug.keystore -st
 
 **Caution**: These are automatically compiled with every push and possibly unstable.
 
-- Linux
+- GNU/Linux
   - [amd64](https://jenkins.libtoxcore.so/view/Clients/job/uTox_linux_amd64/) [[.tar.xz]](https://jenkins.libtoxcore.so/view/Clients/job/uTox_linux_amd64/lastSuccessfulBuild/artifact/utox/utox_linux_amd64.tar.xz)
   - [i686](https://jenkins.libtoxcore.so/view/Clients/job/uTox_linux_i686/) [[.tar.xz]](https://jenkins.libtoxcore.so/view/Clients/job/uTox_linux_i686/lastSuccessfulBuild/artifact/utox/utox_linux_i686.tar.xz)
 - Windows
