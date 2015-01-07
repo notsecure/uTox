@@ -19,12 +19,12 @@ Dependencies:
 - Archlinux:
 
   ```bash
-  sudo pacman -S dbus-c++ fontconfig freetype2 libdbus libvpx libxext libxrender openal v4l-utils
+  sudo pacman -Syu --needed dbus-c++ fontconfig freetype2 libdbus libvpx libxext libxrender openal v4l-utils
   ```
     1. Note: `dbus-c++` is an optional dependency.
 
     2. Please note that [`tox-git`](https://aur.archlinux.org/packages/tox-git/) package from AUR is also required (unless you have already built `toxcore` from source).
-
+    
 Compile:
 ```bash
 make all
