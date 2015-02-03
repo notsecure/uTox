@@ -18,7 +18,7 @@ void maybe_i18nal_string_set_plain(MAYBE_I18NAL_STRING *mis, char_t *str, STRING
 void maybe_i18nal_string_set_i18nal(MAYBE_I18NAL_STRING *mis, UI_STRING_ID string_id) {
     mis->plain.str = NULL;
     mis->plain.length = 0;
-    mis->i18nal = string_id; 
+    mis->i18nal = string_id;
 }
 
 STRING* maybe_i18nal_string_get(MAYBE_I18NAL_STRING *mis) {
@@ -410,7 +410,7 @@ panel_settings = {
         (void*)&dropdown_audio_in, (void*)&dropdown_audio_out, (void*)&dropdown_video,
         (void*)&dropdown_dpi, (void*)&dropdown_language, (void*)&dropdown_proxy,
         (void*)&dropdown_ipv6, (void*)&dropdown_udp, (void*)&dropdown_logging,
-        (void*)&dropdown_audible_notification, (void*)&dropdown_audio_filtering, 
+        (void*)&dropdown_audible_notification, (void*)&dropdown_audio_filtering,
         (void*)&dropdown_close_to_tray, (void*)&dropdown_start_in_tray,
         NULL
     }
@@ -989,13 +989,15 @@ static void panel_update(PANEL *p, int x, int y, int width, int height)
 void ui_size(int width, int height)
 {
     panel_update(&panel_main, 0, 0, width, height);
-    tooltip_reset();
+    // tool tips are buggy; pleas fix
+    // tooltip_reset();
 }
 
 void ui_mouseleave(void)
 {
     panel_mleave(&panel_main);
-    tooltip_reset();
+    // tool tips are buggy; pleas fix
+    // tooltip_reset();
     redraw();
 }
 
@@ -1059,7 +1061,8 @@ void panel_draw(PANEL *p, int x, int y, int width, int height)
 
     dropdown_drawactive();
     contextmenu_draw();
-    tooltip_draw();
+    // tool tips are buggy; pleas fix
+    // tooltip_draw();
 
     enddraw(x, y, width, height);
 }
@@ -1092,9 +1095,10 @@ _Bool panel_mmove(PANEL *p, int x, int y, int width, int height, int mx, int my,
 
     _Bool draw = p->type ? mmovefunc[p->type - 1](p, x, y, width, height, mx, mmy, dx, dy) : 0;
     // Has to be called before children mmove
-    if(p == &panel_main) {
-        draw |= tooltip_mmove();
-    }
+    // tool tips are buggy; pleas fix
+    // if(p == &panel_main) {
+    //    draw |= tooltip_mmove();
+    // }
     PANEL **pp = p->child, *subp;
     if(pp) {
         while((subp = *pp++)) {
@@ -1136,7 +1140,9 @@ static _Bool panel_mdown_sub(PANEL *p)
 
 void panel_mdown(PANEL *p)
 {
-    if(contextmenu_mdown() || tooltip_mdown()) {
+    // tool tips are buggy; pleas fix
+    // if(contextmenu_mdown() || tooltip_mdown()) {
+    if(contextmenu_mdown()) {
         redraw();
         return;
     }
@@ -1241,7 +1247,8 @@ _Bool panel_mup(PANEL *p)
 
     if(p == &panel_main) {
         draw |= contextmenu_mup();
-        tooltip_mup();
+        // tool tips are buggy; pleas fix
+        // tooltip_mup();
         if(draw) {
             redraw();
         }

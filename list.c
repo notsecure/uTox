@@ -62,6 +62,7 @@ static void drawitem(ITEM *i, int UNUSED(x), int y)
         if(f->notify) {
             drawalpha(BM_STATUS_NOTIFY, LIST_RIGHT - SCALE * 13, y + ITEM_HEIGHT / 2 - BM_STATUS_NOTIFY_WIDTH / 2, BM_STATUS_NOTIFY_WIDTH, BM_STATUS_NOTIFY_WIDTH, status_color[status]);
         }
+        // tool tips are buggy; pleas fix
         // tooltip_new(utf8tonative(snprint_t(f->name, sizeof(char_t)*8));
         break;
     }
@@ -517,7 +518,8 @@ _Bool list_mmove(void *UNUSED(n), int UNUSED(x), int UNUSED(y), int UNUSED(width
 
         draw = 1;
     } else {
-        tooltip_draw();
+        // tool tips are buggy; pleas fix
+        // tooltip_draw();
     }
 
     return draw;
@@ -526,7 +528,8 @@ _Bool list_mmove(void *UNUSED(n), int UNUSED(x), int UNUSED(y), int UNUSED(width
 _Bool list_mdown(void *UNUSED(n))
 {
     _Bool draw = 0;
-    tooltip_mdown(); /* may need to return on true */
+    // tool tips are buggy; pleas fix
+    // tooltip_mdown(); /* may need to return on true */
     if(mitem) {
         if(mitem != sitem) {
             selectitem(mitem);
@@ -605,7 +608,8 @@ _Bool list_mwheel(void *UNUSED(n), int UNUSED(height), double UNUSED(d))
 _Bool list_mup(void *UNUSED(n))
 {
     _Bool draw = 0;
-    tooltip_mup(); /* may need to return one true */
+    // tool tips are buggy; pleas fix
+    // tooltip_mup(); /* may need to return one true */
     if(sitem_mousedown && abs(sitem_dy) >= 5) {
         if(nitem) {
             if(sitem->item == ITEM_FRIEND) {
