@@ -79,7 +79,8 @@ _Bool button_mmove(BUTTON *b, int UNUSED(x), int UNUSED(y), int width, int heigh
     if(mouseover) {
         cursor = CURSOR_HAND;
         if(maybe_i18nal_string_is_valid(&b->tooltip_text)) {
-            tooltip_new(&b->tooltip_text);
+            // tool tips are buggy; pleas fix
+            // tooltip_new(&b->tooltip_text);
         }
 
     }
