@@ -136,6 +136,14 @@ msgstr("Akustische Benachrichtigungen einschalten (Klingelton)")
 msgid(IS_TYPING)
 msgstr("schreibt...")
 
+//TODO: Localize or remove.
+//msgid(CLOSE_TO_TRAY)
+//msgstr("Close To Tray")
+
+//TODO: Localize or remove.
+//msgid(START_IN_TRAY)
+//msgstr("Start In Tray")
+
 msgid(COPY)
 msgstr("Kopieren")
 
