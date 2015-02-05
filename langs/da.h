@@ -157,6 +157,14 @@ msgstr("Aktiver lyd notifikation (Ringetone)")
 msgid(IS_TYPING)
 msgstr("skriver...")
 
+//TODO: Localize or remove.
+//msgid(CLOSE_TO_TRAY)
+//msgstr("Close To Tray")
+
+//TODO: Localize or remove.
+//msgid(START_IN_TRAY)
+//msgstr("Start In Tray")
+
 msgid(COPY)
 msgstr("Kopier")
 
