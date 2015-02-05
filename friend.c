@@ -28,7 +28,7 @@ void friend_setname(FRIEND *f, char_t *name, STRING_IDX length)
     f->name[f->name_length] = 0;
 }
 
-void friend_sendimage(FRIEND *f, UTOX_NATIVE_IMAGE native_image, uint16_t width, uint16_t height, UTOX_PNG_IMAGE png_image, size_t png_size)
+void friend_sendimage(FRIEND *f, UTOX_NATIVE_IMAGE *native_image, uint16_t width, uint16_t height, UTOX_PNG_IMAGE png_image, size_t png_size)
 {
     MSG_IMG *msg = malloc(sizeof(MSG_IMG));
     msg->author = 1;
@@ -50,7 +50,7 @@ void friend_sendimage(FRIEND *f, UTOX_NATIVE_IMAGE native_image, uint16_t width,
 void friend_recvimage(FRIEND *f, UTOX_PNG_IMAGE png_image, size_t png_size)
 {
     uint16_t width, height;
-    UTOX_NATIVE_IMAGE native_image = png_to_image(png_image, png_size, &width, &height);
+    UTOX_NATIVE_IMAGE *native_image = png_to_image(png_image, png_size, &width, &height, 0);
     if(!UTOX_NATIVE_IMAGE_IS_VALID(native_image)) {
         return;
     }
@@ -70,6 +70,8 @@ void friend_recvimage(FRIEND *f, UTOX_PNG_IMAGE png_image, size_t png_size)
 void friend_notify(FRIEND *f, char_t *str, STRING_IDX str_length, char_t *msg, STRING_IDX msg_length)
 {
     int len = f->name_length + str_length + 3;
+    uint8_t *f_cid = NULL;
+    
     char_t title[len + 1], *p = title;
     memcpy(p, str, str_length); p += str_length;
     *p++ = ' ';
@@ -77,7 +79,12 @@ void friend_notify(FRIEND *f, char_t *str, STRING_IDX str_length, char_t *msg, S
     memcpy(p, f->name, f->name_length); p += f->name_length;
     *p++ = ')';
     *p = 0;
-    notify(title, len, msg, msg_length);
+
+    if(friend_has_avatar(f)) {
+        f_cid = f->cid;
+    }
+
+    notify(title, len, msg, msg_length, f_cid);
 }
 
 void friend_addmessage_notify(FRIEND *f, char_t *data, STRING_IDX length)
@@ -102,13 +109,14 @@ void friend_addmessage(FRIEND *f, void *data)
 
     message_add(&messages_friend, data, &f->msg);
 
+    /* if msg_type is text/action ? create tray popup */
     switch(msg->msg_type) {
     case MSG_TYPE_TEXT:
     case MSG_TYPE_ACTION_TEXT: {
         char_t m[msg->length + 1];
         memcpy(m, msg->msg, msg->length);
         m[msg->length] = 0;
-        notify(f->name, f->name_length, m, msg->length);
+        notify(f->name, f->name_length, m, msg->length, f->cid);
         break;
     }
     }
@@ -139,14 +147,58 @@ void friend_add(char_t *name, STRING_IDX length, char_t *msg, STRING_IDX msg_len
         return;
     }
 
+    uint8_t name_cleaned[length];
+    uint16_t length_cleaned = 0;
+
+    unsigned int i;
+    for (i = 0; i < length; ++i) {
+        if (name[i] != ' ') {
+            name_cleaned[length_cleaned] = name[i];
+            ++length_cleaned;
+        }
+    }
+
+    if(!length_cleaned) {
+        addfriend_status = ADDF_NONAME;
+        return;
+    }
+
     uint8_t id[TOX_FRIEND_ADDRESS_SIZE];
-    if(length == TOX_FRIEND_ADDRESS_SIZE * 2 && string_to_id(id, name)) {
+    if(length_cleaned == TOX_FRIEND_ADDRESS_SIZE * 2 && string_to_id(id, name_cleaned)) {
         friend_addid(id, msg, msg_length);
     } else {
         /* not a regular id, try DNS discovery */
         addfriend_status = ADDF_DISCOVER;
-        dns_request(name, length);
+        dns_request(name_cleaned, length_cleaned);
     }
+}
+
+#define LOGFILE_EXT ".txt"
+
+void friend_history_clear(FRIEND *f)
+{
+    uint8_t path[512], *p;
+
+    message_clear(&messages_friend, &f->msg);
+
+    {
+        /* We get the file path of the log file */
+        p = path + datapath(path);
+
+        if(countof(path) - (p - path) < TOX_CLIENT_ID_SIZE * 2 + sizeof(LOGFILE_EXT))
+        {
+            /* We ensure that we have enough space in the buffer,
+               if not we fail */
+            debug("error/history_clear: path too long\n");
+            return;
+        }
+
+        cid_to_string(p, f->cid);
+        p += TOX_CLIENT_ID_SIZE * 2;
+        memcpy((char*)p, LOGFILE_EXT, sizeof(LOGFILE_EXT));
+    }
+
+    remove((const char *)path);
 }
 
 void friend_free(FRIEND *f)

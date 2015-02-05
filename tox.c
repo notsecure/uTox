@@ -7,21 +7,22 @@ typedef struct {
     void *data;
 } TOX_MSG;
 
-static TOX_MSG tox_msg, audio_msg, video_msg;
-static volatile _Bool tox_thread_msg, audio_thread_msg, video_thread_msg;
+static TOX_MSG tox_msg, audio_msg, video_msg, toxav_msg;
+static volatile _Bool tox_thread_msg, audio_thread_msg, video_thread_msg, toxav_thread_msg;
+static volatile _Bool save_needed = 1;
 
 /* Writes log filename for fid to dest. returns length written */
 static int log_file_name(uint8_t *dest, size_t size_dest, Tox *tox, int fid)
 {
-    if (size_dest < TOX_CLIENT_ID_SIZE * 2 + sizeof(".txt"))
+    if (size_dest < TOX_PUBLIC_KEY_SIZE * 2 + sizeof(".txt"))
         return -1;
 
-    uint8_t client_id[TOX_CLIENT_ID_SIZE];
+    uint8_t client_id[TOX_PUBLIC_KEY_SIZE];
     tox_get_client_id(tox, fid, client_id);
-    cid_to_string(dest, client_id); dest += TOX_CLIENT_ID_SIZE * 2;
+    cid_to_string(dest, client_id); dest += TOX_PUBLIC_KEY_SIZE * 2;
     memcpy((char*)dest, ".txt", sizeof(".txt"));
 
-    return TOX_CLIENT_ID_SIZE * 2 + sizeof(".txt");
+    return TOX_PUBLIC_KEY_SIZE * 2 + sizeof(".txt");
 }
 
 enum {
@@ -230,6 +231,20 @@ void toxvideo_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *d
     video_thread_msg = 1;
 }
 
+void toxav_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *data)
+{
+    while(toxav_thread_msg) {
+        yieldcpu(1);
+    }
+
+    toxav_msg.msg = msg;
+    toxav_msg.param1 = param1;
+    toxav_msg.param2 = param2;
+    toxav_msg.data = data;
+
+    toxav_thread_msg = 1;
+}
+
 #include "tox_callbacks.h"
 #include "tox_av.h"
 
@@ -261,13 +276,48 @@ static void set_callbacks(Tox *tox)
     tox_callback_typing_change(tox, callback_typing_change, NULL);
     tox_callback_read_receipt(tox, callback_read_receipt, NULL);
     tox_callback_connection_status(tox, callback_connection_status, NULL);
+    tox_callback_avatar_info(tox, callback_avatar_info, NULL);
+    tox_callback_avatar_data(tox, callback_avatar_data, NULL);
 
     tox_callback_group_invite(tox, callback_group_invite, NULL);
     tox_callback_group_message(tox, callback_group_message, NULL);
     tox_callback_group_action(tox, callback_group_action, NULL);
     tox_callback_group_namelist_change(tox, callback_group_namelist_change, NULL);
+    tox_callback_group_title(tox, callback_group_title, NULL);
 
     utox_set_callbacks_for_transfer(tox);
+}
+
+/* tries to load avatar from disk for given client id string and set avatar based on saved png data
+ *  avatar is avatar to initialize. Will be unset if no file is found on disk or if file is corrupt or too large, 
+ *      otherwise will be set to avatar found on disk
+ *  id is cid string of whose avatar to find(see also load_avatar in avatar.h)
+ *  if png_data_out is not NULL, the png data loaded from disk will be copied to it.
+ *      if it is not null, it should be at least TOX_AVATAR_MAX_DATA_LENGTH bytes long
+ *  if png_size_out is not null, the size of the png data will be stored in it
+ *
+ *  returns: 1 on successful loading, 0 on failure
+ */
+static _Bool init_avatar(AVATAR *avatar, const char_t *id, uint8_t *png_data_out, uint32_t *png_size_out) {
+    unset_avatar(avatar);
+    uint8_t avatar_data[TOX_AVATAR_MAX_DATA_LENGTH];
+    uint32_t size;
+    if (load_avatar(id, avatar_data, &size)) {
+        _Bool have_hash = load_avatar_hash(id, avatar->hash);
+        if (set_avatar(avatar, avatar_data, size, !have_hash)) {
+            if (png_data_out) {
+                memcpy(png_data_out, avatar_data, size);
+            }
+            if (png_size_out) {
+                *png_size_out = size;
+            }
+            if (!have_hash) { // save newly created hash if it wasn't found on disk
+                save_avatar_hash(id, avatar->hash);
+            }
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static _Bool load_save(Tox *tox)
@@ -276,18 +326,33 @@ static _Bool load_save(Tox *tox)
         uint8_t path[512], *p;
         uint32_t size;
 
+        /* Try the STS compliant save location */
         p = path + datapath(path);
-        strcpy((char*)p, "tox_save");
-
+        strcpy((char*)p, "tox_save.tox");
         void *data = file_raw((char*)path, &size);
         if(!data) {
-            p = path + datapath_old(path);
+            /* Try filename missing the .tox extension */
+            p = path + datapath(path);
             strcpy((char*)p, "tox_save");
             data = file_raw((char*)path, &size);
-            if (!data) {
-                data = file_raw("tox_save", &size);
-                if(!data) {
-                    return 0;
+            if(!data) {
+                /* That didn't work, do we have a backup? */
+                p = path + datapath(path);
+                strcpy((char*)p, "tox_save.tmp");
+                data = file_raw((char*)path, &size);
+                if(!data){
+                    /* No backup huh? Is it in an old location we support? */
+                    p = path + datapath_old(path);
+                    strcpy((char*)p, "tox_save");
+                    data = file_raw((char*)path, &size);
+                    if (!data) {
+                        /* Well, lets try the current directory... */
+                        data = file_raw("tox_save", &size);
+                        if(!data) {
+                            /* F***it I give up! */
+                            return 0;
+                        }
+                    }
                 }
             }
         }
@@ -316,6 +381,10 @@ static _Bool load_save(Tox *tox)
         f->status_message = malloc(size);
         tox_get_status_message(tox, i, f->status_message, size);
         f->status_length = size;
+
+        char_t cid[TOX_PUBLIC_KEY_SIZE * 2];
+        cid_to_string(cid, f->cid);
+        init_avatar(&f->avatar, cid, NULL, NULL);
 
         log_read(tox, i);
 
@@ -359,9 +428,9 @@ static void write_save(Tox *tox)
     tox_save(tox, data);
 
     p = path_real + datapath(path_real);
-    memcpy(p, "tox_save", sizeof("tox_save"));
+    memcpy(p, "tox_save.tox", sizeof("tox_save.tox"));
 
-    unsigned int path_len = (p - path_real) + sizeof("tox_save");
+    unsigned int path_len = (p - path_real) + sizeof("tox_save.tox");
     memcpy(path_tmp, path_real, path_len);
     memcpy(path_tmp + (path_len - 1), ".tmp", sizeof(".tmp"));
 
@@ -382,7 +451,14 @@ static void write_save(Tox *tox)
             debug("Saved data\n");
         }
     }
+    int ch = ch_mod(path_real);
+    if(!ch){
+        debug("CHMOD: success\n");
+    } else {
+        debug("CHMOD: failure\n");
+    }
 
+    save_needed = 0;
     free(data);
 }
 
@@ -400,6 +476,8 @@ void tox_settingschanged(void)
 
     toxaudio_postmessage(AUDIO_KILL, 0, 0, NULL);
     toxvideo_postmessage(VIDEO_KILL, 0, 0, NULL);
+    toxav_postmessage(TOXAV_KILL, 0, 0, NULL);
+
     tox_postmessage(0, 1, 0, NULL);
 
     while(!tox_thread_init) {
@@ -441,111 +519,147 @@ static void utox_thread_work_for_typing_notifications(Tox *tox, uint64_t time)
     }
 }
 
+/** void tox_thread(void)
+ *
+ * Main tox function, starts a new toxcore for utox to use, and then spwans it's
+ * threads.
+ *
+ * Accepts and retuns nothing.
+ */
 void tox_thread(void *UNUSED(args))
 {
     Tox *tox;
     ToxAv *av;
     uint8_t id[TOX_FRIEND_ADDRESS_SIZE];
 
-TOP:;
-    debug("new tox object ipv6: %u no_udp: %u proxy: %u %s %u\n", options.ipv6enabled, options.udp_disabled, options.proxy_enabled, options.proxy_address, options.proxy_port);
-    if((tox = tox_new(&options)) == NULL) {
-        debug("trying without proxy\n");
-        if(!options.proxy_enabled || (options.proxy_enabled = 0, (tox = tox_new(&options)) == NULL)) {
-            debug("trying without ipv6\n");
-            if(!options.ipv6enabled || (options.ipv6enabled = 0, (tox = tox_new(&options)) == NULL)) {
-                debug("tox_new() failed\n");
-                exit(1);
+    _Bool reconfig;
+
+    do {
+        // Create main connection
+        debug("new tox object ipv6: %u no_udp: %u proxy: %u %s %u\n", options.ipv6enabled, options.udp_disabled, options.proxy_type, options.proxy_address, options.proxy_port);
+        if((tox = tox_new(&options)) == NULL) {
+            debug("trying without proxy\n");
+            if(!options.proxy_type || (options.proxy_type = TOX_PROXY_NONE, (tox = tox_new(&options)) == NULL)) {
+                debug("trying without ipv6\n");
+                if(!options.ipv6enabled || (options.ipv6enabled = 0, (tox = tox_new(&options)) == NULL)) {
+                    debug("tox_new() failed\n");
+                    exit(1);
+                }
+                dropdown_ipv6.selected = dropdown_ipv6.over = 1;
             }
-            dropdown_ipv6.selected = dropdown_ipv6.over = 1;
-        }
-        dropdown_proxy.selected = dropdown_proxy.over = 0;
-    }
-
-    if(!load_save(tox)) {
-        debug("No save file, using defaults\n");
-        load_defaults(tox);
-    }
-
-    edit_setstr(&edit_name, self.name, self.name_length);
-    edit_setstr(&edit_status, self.statusmsg, self.statusmsg_length);
-
-    tox_get_address(tox, id);
-    id_to_string(self.id, id);
-
-    debug("Tox ID: %.*s\n", (int)sizeof(self.id), self.id);
-
-    set_callbacks(tox);
-
-    do_bootstrap(tox);
-
-    av = toxav_new(tox, MAX_CALLS);
-
-    set_av_callbacks(av);
-
-
-    global_av = av;
-    tox_thread_init = 1;
-
-    thread(audio_thread, av);
-    thread(video_thread, av);
-
-    _Bool connected = 0, reconfig;
-    uint64_t last_save = get_time(), time;
-    while(1) {
-        tox_do(tox);
-
-        if(tox_isconnected(tox) != connected) {
-            connected = !connected;
-            postmessage(DHT_CONNECTED, connected, 0, NULL);
-
-            debug("Connected to DHT: %u\n", connected);
+            dropdown_proxy.selected = dropdown_proxy.over = 0;
         }
 
-        time = get_time();
+        // Load saved information, else use defaults
+        if(!load_save(tox)) {
+            debug("No save file, using defaults\n");
+            load_defaults(tox);
+        }
 
-        if(time - last_save >= (uint64_t)10 * 1000 * 1000 * 1000) {
-            last_save = time;
+        // Set local info for self
+        edit_setstr(&edit_name, self.name, self.name_length);
+        edit_setstr(&edit_status, self.statusmsg, self.statusmsg_length);
 
-            if(!connected) {
-                do_bootstrap(tox);
+        // Get tox id, and gets the hex version for utox
+        tox_get_address(tox, id);
+        id_to_string(self.id, id);
+        debug("Tox ID: %.*s\n", (int)sizeof(self.id), self.id);
+
+        uint8_t avatar_data[TOX_AVATAR_MAX_DATA_LENGTH];
+        uint32_t avatar_size;
+        if (init_avatar(&self.avatar, self.id, avatar_data, &avatar_size)) {
+            tox_set_avatar(tox, TOX_AVATAR_FORMAT_PNG, avatar_data, avatar_size); // set avatar before connecting
+
+            char_t hash_string[TOX_HASH_LENGTH * 2];
+            hash_to_string(hash_string, self.avatar.hash);
+            debug("Tox Avatar Hash: %.*s\n", (int)sizeof(hash_string), hash_string);
+        }
+
+        // Give toxcore the functions to call
+        set_callbacks(tox);
+
+        // Connect to bootstraped nodes in "tox_bootstrap.h"
+        do_bootstrap(tox);
+
+        // Start the tox av session.
+        av = toxav_new(tox, MAX_CALLS);
+
+        // Give toxcore the av functions to call
+        set_av_callbacks(av);
+
+        global_av = av;
+        tox_thread_init = 1;
+
+        // Start the treads
+        thread(audio_thread, av);
+        thread(video_thread, av);
+        thread(toxav_thread, av);
+
+        //
+        _Bool connected = 0;
+        uint64_t last_save = get_time(), time;
+        while(1) {
+            // Put toxcore to work
+            tox_do(tox);
+
+            // Check currents connection
+            if(tox_isconnected(tox) != connected) {
+                connected = !connected;
+                postmessage(DHT_CONNECTED, connected, 0, NULL);
+
+                debug("Connected to DHT: %u\n", connected);
             }
 
-            write_save(tox);
-        }
+            time = get_time();
 
-        if(tox_thread_msg) {
-            TOX_MSG *msg = &tox_msg;
-            if(!msg->msg) {
-                reconfig = msg->param1;
+            // Wait 1million ticks then reconnect if needed and write save
+            if(time - last_save >= (uint64_t)10 * 1000 * 1000 * 1000) {
+                last_save = time;
+
+                if(!connected) {
+                    do_bootstrap(tox);
+                }
+                //save every 10mill.
+                if (save_needed || (time - last_save >= (uint64_t)100 * 1000 * 1000 * 1000)){
+                    write_save(tox);
+                }
+            }
+
+            // If there's a message, load it, and send to the tox message thread
+            if(tox_thread_msg) {
+                TOX_MSG *msg = &tox_msg;
+                // If msg->msg is 0, reconfig if needed and break from tox_do
+                if(!msg->msg) {
+                    reconfig = msg->param1;
+                    tox_thread_msg = 0;
+                    break;
+                }
+                tox_thread_message(tox, av, time, msg->msg, msg->param1, msg->param2, msg->data);
                 tox_thread_msg = 0;
-                break;
             }
-            tox_thread_message(tox, av, time, msg->msg, msg->param1, msg->param2, msg->data);
-            tox_thread_msg = 0;
+
+            // Thread active transfers and check if friend is typing
+            utox_thread_work_for_transfers(tox, time);
+            utox_thread_work_for_typing_notifications(tox, time);
+
+            // Ask toxcore how many ms to wait, then wait at the most 20ms
+            uint32_t interval = tox_do_interval(tox);
+            yieldcpu((interval > 20) ? 20 : interval);
         }
 
-        utox_thread_work_for_transfers(tox, time);
-        utox_thread_work_for_typing_notifications(tox, time);
+        write_save(tox);
 
-        uint32_t interval = tox_do_interval(tox);
-        yieldcpu((interval > 20) ? 20 : interval);
-    }
+        // Wait for all a/v threads to return 0
+        while(audio_thread_init || video_thread_init || toxav_thread_init) {
+            yieldcpu(1);
+        }
 
-    write_save(tox);
+        // Stop av threads, and toxcore.
+        debug("av_thread exit, tox thread ending\n");
+        toxav_kill(av);
+        tox_kill(tox);
 
-    while(audio_thread_init || video_thread_init) {
-        yieldcpu(1);
-    }
-
-    debug("av_thread exit, tox thread ending\n");
-
-    toxav_kill(av);
-    tox_kill(tox);
-
-    if(reconfig) {
-        goto TOP;
-    }
+    } while(reconfig);
 
     tox_thread_init = 0;
 }
@@ -558,6 +672,22 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          * data: name
          */
         tox_set_name(tox, data, param1);
+        break;
+    }
+
+    case TOX_SETAVATAR: {
+        /*
+         * param1: avatar format
+         * param2: length of avatar data
+         * data: raw avatar data (PNG)
+         */
+        tox_set_avatar(tox, param1, data, param2);
+        free(data);
+        break;
+    }
+
+    case TOX_UNSETAVATAR: {
+        tox_unset_avatar(tox);
         break;
     }
 
@@ -639,6 +769,8 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          * param2: message length
          * data: message
          */
+
+        /* write message to friend to logfile */
         log_write(tox, param1, data, param2, 1, LOG_FILE_MSG_TYPE_TEXT);
 
         void *p = data;
@@ -660,6 +792,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          * data: message
          */
 
+        /* write action/emote to friend to logfile */
         log_write(tox, param1, data, param2, 1, LOG_FILE_MSG_TYPE_ACTION);
 
         void *p = data;
@@ -736,7 +869,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         /* param1: friend #
          */
         ToxAvCSettings settings = av_DefaultSettings;
-        settings.call_type = TypeVideo;
+        settings.call_type = av_TypeVideo;
         settings.max_video_width = max_video_width;
         settings.max_video_height = max_video_height;
 
@@ -752,7 +885,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          * param2: call #
          */
         ToxAvCSettings settings = av_DefaultSettings;
-        settings.call_type = TypeVideo;
+        settings.call_type = av_TypeVideo;
         settings.max_video_width = max_video_width;
         settings.max_video_height = max_video_height;
 
@@ -775,7 +908,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          */
         ToxAvCSettings settings = av_DefaultSettings;
         if(param2) {
-            settings.call_type = TypeVideo;
+            settings.call_type = av_TypeVideo;
             settings.max_video_width = max_video_width;
             settings.max_video_height = max_video_height;
         }
@@ -791,12 +924,26 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         break;
     }
 
+    case TOX_CANCELCALL: {
+        /* param1: call #
+         * param2: friend #
+         */
+        toxav_cancel(av, param1, param2, "Call canceled by friend");
+        postmessage(FRIEND_CALL_STATUS, param2, param1, (void*)(size_t)CALL_NONE);
+        break;
+    }
+
     case TOX_NEWGROUP: {
         /*
          */
-        int g = tox_add_groupchat(tox);
+        int g = -1;
+        if (param1) {
+            g = toxav_add_av_groupchat(tox, &callback_av_group_audio, NULL);
+        } else {
+            g = tox_add_groupchat(tox);
+        }
         if(g != -1) {
-            postmessage(GROUP_ADD, g, 0, NULL);
+            postmessage(GROUP_ADD, g, 0, tox);
         }
 
         break;
@@ -814,6 +961,30 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          * param2: friend #
          */
         tox_invite_friend(tox, param2, param1);
+        break;
+    }
+
+    case TOX_GROUPCHANGETOPIC: {
+        /* param1: group #
+         * param2: topic length
+         * data: topic
+         */
+        tox_group_set_title(tox, param1, data, param2);
+        postmessage(GROUP_TITLE, param1, param2, data);
+        break;
+    }
+
+    case TOX_GROUP_AUDIO_START:{
+        /* param1: group #
+         */
+        postmessage(GROUP_AUDIO_START, param1, 0, NULL);
+        break;
+    }
+
+    case TOX_GROUP_AUDIO_END:{
+        /* param1: group #
+         */
+        postmessage(GROUP_AUDIO_END, param1, 0, NULL);
         break;
     }
 
@@ -989,8 +1160,10 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
     }
 
     }
+    save_needed = 1;
 }
 
+/** Translates status code to text then sends back to the user */
 static void file_notify(FRIEND *f, MSG_FILE *msg)
 {
     STRING *str;
@@ -1067,7 +1240,17 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         break;
     }
 
-    case OPEN_FILES: {
+    case SET_AVATAR: {
+        /* param1: size of data
+         * data: png data
+         */
+        self_set_and_save_avatar(data, param1);
+        free(data);
+        redraw();
+        break;
+    }
+
+    case SEND_FILES: {
         tox_postmessage(TOX_SENDFILES, param1, param2, data);
         break;
     }
@@ -1083,11 +1266,25 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         } else {
             list_dropdown_add_localized(&dropdown_audio_in, param1, data);
         }
+
+        if (loaded_audio_in_device != 0 && (dropdown_audio_in.dropcount - 1) == loaded_audio_in_device) {
+            toxaudio_postmessage(AUDIO_SET_INPUT, 0, 0, data);
+            dropdown_audio_in.selected = loaded_audio_in_device;
+            loaded_audio_in_device = 0;
+        }
+
         break;
     }
 
     case NEW_AUDIO_OUT_DEVICE: {
         list_dropdown_add_hardcoded(&dropdown_audio_out, data, data);
+
+        if (loaded_audio_out_device != 0 && (dropdown_audio_out.dropcount - 1) == loaded_audio_out_device) {
+            toxaudio_postmessage(AUDIO_SET_OUTPUT, 0, 0, data);
+            dropdown_audio_out.selected = loaded_audio_out_device;
+            loaded_audio_out_device = 0;
+        }
+
         break;
     }
 
@@ -1165,7 +1362,16 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     }
 
     case FRIEND_DEL: {
-        friend_free(data);
+        FRIEND *f = data;
+
+        // commented out incase you have multiple clients in the same data dir and remove one as friend from the other
+        //   (it would remove his avatar locally too otherwise)
+        //char_t cid[TOX_PUBLIC_KEY_SIZE * 2];
+        //cid_to_string(cid, f->cid);
+        //delete_saved_avatar(cid);
+        //delete_avatar_hash(cid);
+
+        friend_free(f);
         friends--;
         break;
     }
@@ -1182,6 +1388,40 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     case FRIEND_NAME: {
         FRIEND *f = &friend[param1];
         friend_setname(f, data, param2);
+        updatefriend(f);
+        break;
+    }
+
+    case FRIEND_SETAVATAR: {
+        /* param1: friend id
+           param2: png size
+           data: png data
+        */
+        FRIEND *f = &friend[param1];
+        if (set_avatar(&f->avatar, data, param2, 0)) {
+
+            // save avatar and hash to disk
+            char_t cid[TOX_PUBLIC_KEY_SIZE * 2];
+            cid_to_string(cid, f->cid);
+            save_avatar(cid, data, param2);
+            save_avatar_hash(cid, f->avatar.hash);
+
+            updatefriend(f);
+        }
+        free(data);
+        break;
+    }
+
+    case FRIEND_UNSETAVATAR: {
+        FRIEND *f = &friend[param1];
+        unset_avatar(&f->avatar);
+
+        // remove avatar and hash from disk
+        char_t cid[TOX_PUBLIC_KEY_SIZE * 2];
+        cid_to_string(cid, f->cid);
+        delete_saved_avatar(cid);
+        delete_avatar_hash(cid);
+
         updatefriend(f);
         break;
     }
@@ -1502,6 +1742,7 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         g->topic_length = sizeof("Drag friends to invite them") - 1;
         memcpy(g->topic, "Drag friends to invite them", sizeof("Drag friends to invite them") - 1);
         g->msg.scroll = 1.0;
+        g->type = tox_group_get_type(data, param1);
         list_addgroup(g);
         redraw();
         break;
@@ -1522,6 +1763,9 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     case GROUP_PEER_DEL: {
         GROUPCHAT *g = &group[param1];
 
+        if (param2 > MAX_GROUP_PEERS) //TODO: dynamic arrays.
+            break;
+
         if(g->peername[param2]) {
             free(g->peername[param2]);
             g->peername[param2] = NULL;
@@ -1530,6 +1774,18 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         g->peers--;
         g->peername[param2] = g->peername[g->peers];
         g->peername[g->peers] = NULL;
+
+        if (g->type == TOX_GROUPCHAT_TYPE_AV) {
+            g->last_recv_audio[param2] = g->last_recv_audio[g->peers];
+            g->last_recv_audio[g->peers] = 0;
+            group_av_peer_remove(g, param2);
+            g->source[param2] = g->source[g->peers];
+        }
+
+        if (g->peers == g->our_peer_number) {
+            g->our_peer_number = param2;
+        }
+
         g->topic_length = snprintf((char*)g->topic, sizeof(g->topic), "%u users in chat", g->peers);
 
         updategroup(g);
@@ -1541,22 +1797,78 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     case GROUP_PEER_NAME: {
         GROUPCHAT *g = &group[param1];
 
+        if (param2 > MAX_GROUP_PEERS) //TODO: dynamic arrays.
+            break;
+
         if(g->peername[param2]) {
             free(g->peername[param2]);
         }
 
         if(tox_message_id == GROUP_PEER_ADD) {
+            if (g->type == TOX_GROUPCHAT_TYPE_AV) {
+                group_av_peer_add(g, param2);
+            }
+
+            if (tox_group_peernumber_is_ours(data, param1, param2)) {
+                g->our_peer_number = param2;
+            }
+
             uint8_t *n = malloc(10);
             n[0] = 9;
             memcpy(n + 1, "<unknown>", 9);
             data = n;
             g->peers++;
+
         }
 
         g->peername[param2] = data;
 
         g->topic_length = snprintf((char*)g->topic, sizeof(g->topic), "%u users in chat", g->peers);
 
+        updategroup(g);
+
+        break;
+    }
+
+    case GROUP_TITLE: {
+        GROUPCHAT *g = &group[param1];
+
+        if (param2 > sizeof(g->name)) {
+            memcpy(g->name, data, sizeof(g->name));
+            g->name_length = sizeof(g->name);
+        } else {
+            memcpy(g->name, data, param2);
+            g->name_length = param2;
+        }
+
+        free(data);
+        updategroup(g);
+        break;
+    }
+
+    case GROUP_AUDIO_START: {
+        GROUPCHAT *g = &group[param1];
+
+        if (g->type == TOX_GROUPCHAT_TYPE_AV) {
+            g->audio_calling = 1;
+            toxaudio_postmessage(GROUP_AUDIO_CALL_START, param1, 0, NULL);
+            updategroup(g);
+        }
+        break;
+    }
+    case GROUP_AUDIO_END: {
+        GROUPCHAT *g = &group[param1];
+
+        if (g->type == TOX_GROUPCHAT_TYPE_AV) {
+            g->audio_calling = 0;
+            toxaudio_postmessage(GROUP_AUDIO_CALL_END, param1, 0, NULL);
+            updategroup(g);
+        }
+        break;
+    }
+
+    case GROUP_UPDATE: {
+        //GROUPCHAT *g = &group[param1];
         updategroup(g);
 
         break;

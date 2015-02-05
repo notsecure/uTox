@@ -5,11 +5,11 @@ static void av_start(int32_t call_index, void *arg)
     int fid = toxav_get_peer_id(arg, call_index, 0);
     toxav_get_peer_csettings(arg, call_index, 0, &peer_settings);
 
-    _Bool video = (peer_settings.call_type == TypeVideo);
+    _Bool video = (peer_settings.call_type == av_TypeVideo);
 
     debug("video for this call: %u\n", video);
 
-    if(toxav_prepare_transmission(arg, call_index, av_jbufdc, av_VADd, 1) == 0) {
+    if(toxav_prepare_transmission(arg, call_index, 1) == 0) {
         if(video) {
             postmessage(FRIEND_CALL_VIDEO, fid, call_index, (void*)(640 | (size_t)480 << 16));
         } else {
@@ -26,7 +26,7 @@ static void callback_av_invite(void *arg, int32_t call_index, void *UNUSED(userd
 
     ToxAvCSettings peer_settings;
     toxav_get_peer_csettings(arg, call_index, 0, &peer_settings);
-    _Bool video = (peer_settings.call_type == TypeVideo);
+    _Bool video = (peer_settings.call_type == av_TypeVideo);
 
     postmessage(FRIEND_CALL_STATUS, fid, call_index, (void*)(size_t)(video ? CALL_INVITED_VIDEO : CALL_INVITED));
     toxaudio_postmessage(AUDIO_PLAY_RINGTONE, call_index, 0, NULL);
@@ -77,20 +77,6 @@ static void callback_av_ringing(void *arg, int32_t call_index, void *UNUSED(user
     debug("A/V Ringing (%i)\n", call_index);
 }
 
-static void callback_av_starting(void *arg, int32_t call_index, void *UNUSED(userdata))
-{
-    av_start(call_index, arg);
-
-    debug("A/V Starting (%i)\n", call_index);
-}
-
-static void callback_av_ending(void *arg, int32_t call_index, void *UNUSED(userdata))
-{
-    stopcall();
-
-    debug("A/V Ending (%i)\n", call_index);
-}
-
 static void callback_av_requesttimeout(void *arg, int32_t call_index, void *UNUSED(userdata))
 {
     endcall();
@@ -105,14 +91,19 @@ static void callback_av_peertimeout(void *arg, int32_t call_index, void *UNUSED(
     debug("A/V PeerTimeout (%i)\n", call_index);
 }
 
-static void callback_av_mediachange(void *arg, int32_t call_index, void *UNUSED(userdata))
+static void callback_av_selfmediachange(void *arg, int32_t call_index, void *UNUSED(userdata))
+{
+    debug("A/V SelfMediachange (%i)\n", call_index);
+}
+
+static void callback_av_peermediachange(void *arg, int32_t call_index, void *UNUSED(userdata))
 {
     ToxAvCSettings settings;
     toxav_get_peer_csettings(arg, call_index, 0, &settings);
     int fid = toxav_get_peer_id(arg, call_index, 0);
 
-    postmessage(FRIEND_CALL_MEDIACHANGE, fid, call_index, (settings.call_type == TypeVideo) ? (void*)1 : NULL);
-    debug("A/V Mediachange (%i)\n", call_index);
+    postmessage(FRIEND_CALL_MEDIACHANGE, fid, call_index, (settings.call_type == av_TypeVideo) ? (void*)1 : NULL);
+    debug("A/V PeerMediachange (%i)\n", call_index);
 }
 
 uint8_t lbuffer[800 * 600 * 4]; //needs to be always large enough for encoded frames
@@ -292,7 +283,7 @@ static void video_thread(void *args)
     video_thread_init = 0;
 }
 
-#ifndef __ANDROID__
+#ifndef NATIVE_ANDROID_AUDIO
 #ifdef __APPLE__
 #include <OpenAL/al.h>
 #include <OpenAL/alc.h>
@@ -307,10 +298,13 @@ static void video_thread(void *args)
 
 #endif
 
+#ifdef AUDIO_FILTERING
+#include <filter_audio.h>
+#endif
+
 static ALCdevice *device_out, *device_in;
 static ALCcontext *context;
 static ALuint source[MAX_CALLS];
-
 
 static ALCdevice* alcopencapture(void *handle)
 {
@@ -322,7 +316,11 @@ static ALCdevice* alcopencapture(void *handle)
         return handle;
     }
 
-    return alcCaptureOpenDevice(handle, av_DefaultSettings.audio_sample_rate, AL_FORMAT_MONO16, (av_DefaultSettings.audio_frame_duration * av_DefaultSettings.audio_sample_rate * 4) / 1000);
+    if (av_DefaultSettings.audio_channels == 1) {
+        return alcCaptureOpenDevice(handle, av_DefaultSettings.audio_sample_rate, AL_FORMAT_MONO16, (av_DefaultSettings.audio_frame_duration * av_DefaultSettings.audio_sample_rate * 4) / 1000);
+    } else {
+        return alcCaptureOpenDevice(handle, av_DefaultSettings.audio_sample_rate, AL_FORMAT_STEREO16, ((av_DefaultSettings.audio_frame_duration * av_DefaultSettings.audio_sample_rate * 4) / 1000) * av_DefaultSettings.audio_channels);
+    }
 }
 
 static void alccapturestart(void *handle)
@@ -354,7 +352,7 @@ static void alccaptureclose(void *handle)
     alcCaptureCloseDevice(handle);
 }
 
-static void sourceplaybuffer(int i, int16_t *data, int samples, uint8_t channels, unsigned int sample_rate)
+static void sourceplaybuffer(int i, const int16_t *data, int samples, uint8_t channels, unsigned int sample_rate)
 {
     if(!channels || channels > 2) {
         return;
@@ -396,9 +394,12 @@ static void audio_thread(void *args)
     void *audio_device = NULL;
 
     _Bool call[MAX_CALLS] = {0}, preview = 0;
+    _Bool groups_audio[MAX_NUM_GROUPS] = {0};
 
     int perframe = (av_DefaultSettings.audio_frame_duration * av_DefaultSettings.audio_sample_rate) / 1000;
-    uint8_t buf[perframe * 2], dest[perframe * 2];
+    uint8_t buf[perframe * 2 * av_DefaultSettings.audio_channels], dest[perframe * 2 * av_DefaultSettings.audio_channels];
+    memset(buf, 0, sizeof(buf));
+
     uint8_t audio_count = 0;
     _Bool record_on = 0;
 
@@ -479,11 +480,16 @@ static void audio_thread(void *args)
         free(samples);
     }
 
-    unsigned int i;
-    for (i = 0; i < MAX_CALLS; ++i) {
-        alSourcei(ringSrc[i], AL_LOOPING, AL_TRUE);
-        alSourcei(ringSrc[i], AL_BUFFER, RingBuffer);
+    {
+        unsigned int i;
+        for (i = 0; i < MAX_CALLS; ++i) {
+            alSourcei(ringSrc[i], AL_LOOPING, AL_TRUE);
+            alSourcei(ringSrc[i], AL_BUFFER, RingBuffer);
+        }
     }
+#ifdef AUDIO_FILTERING
+    Filter_Audio *f_a = NULL;
+#endif
 
     audio_thread_init = 1;
 
@@ -539,6 +545,23 @@ static void audio_thread(void *args)
                 device_out = device;
 
                 alGenSources(countof(source), source);
+                alGenSources(MAX_CALLS, ringSrc);
+
+                Tox *tox = toxav_get_tox(av);
+                uint32_t num_chats = tox_count_chatlist(tox);
+
+                if (num_chats != 0) {
+                    int32_t chats[num_chats];
+                    uint32_t max = tox_get_chatlist(tox, chats, num_chats);
+
+                    unsigned int i;
+                    for (i = 0; i < max; ++i) {
+                        if (tox_group_get_type(tox, chats[i]) == TOX_GROUPCHAT_TYPE_AV) {
+                            GROUPCHAT *g = &group[chats[i]];
+                            alGenSources(g->peers, g->source);
+                        }
+                    }
+                }
 
                 debug("set audio out\n");
                 break;
@@ -561,6 +584,20 @@ static void audio_thread(void *args)
             case AUDIO_CALL_START: {
                 call[m->param1] = 1;
                 audio_count++;
+                if(!record_on) {
+                    device_in = alcopencapture(audio_device);
+                    if(device_in) {
+                        alccapturestart(device_in);
+                        record_on = 1;
+                        debug("start\n");
+                    }
+                }
+                break;
+            }
+
+            case GROUP_AUDIO_CALL_START: {
+                audio_count++;
+                groups_audio[m->param1] = 1;
                 if(!record_on) {
                     device_in = alcopencapture(audio_device);
                     if(device_in) {
@@ -599,6 +636,21 @@ static void audio_thread(void *args)
                 break;
             }
 
+            case GROUP_AUDIO_CALL_END: {
+                if(!groups_audio[m->param1]) {
+                    break;
+                }
+                audio_count--;
+                groups_audio[m->param1] = 0;
+                if(!audio_count && record_on) {
+                    alccapturestop(device_in);
+                    alccaptureclose(device_in);
+                    record_on = 0;
+                    debug("stop\n");
+                }
+                break;
+            }
+
             case AUDIO_PLAY_RINGTONE: {
                 if(!audible_notifications_enabled) {
                     break;
@@ -609,19 +661,39 @@ static void audio_thread(void *args)
             }
 
             case AUDIO_STOP_RINGTONE: {
-                    ALint state;
-                    alGetSourcei(ringSrc[m->param1], AL_SOURCE_STATE, &state);
-                    if(state == AL_PLAYING) {
-                        alSourceStop(ringSrc[m->param1]);
-                    }
-
-                    break;
+                ALint state;
+                alGetSourcei(ringSrc[m->param1], AL_SOURCE_STATE, &state);
+                if(state == AL_PLAYING) {
+                    alSourceStop(ringSrc[m->param1]);
                 }
 
+                break;
+            }
             }
 
             audio_thread_msg = 0;
         }
+
+#ifdef AUDIO_FILTERING
+        if (!f_a && audio_filtering_enabled) {
+            f_a = new_filter_audio(av_DefaultSettings.audio_sample_rate);
+            if (!f_a) {
+                audio_filtering_enabled = 0;
+                debug("filter audio failed\n");
+            } else {
+                debug("filter audio on\n");
+            }
+        } else if (f_a && !audio_filtering_enabled) {
+            kill_filter_audio(f_a);
+            f_a = NULL;
+            debug("filter audio off\n");
+        }
+#else
+        if (audio_filtering_enabled)
+            audio_filtering_enabled = 0;
+#endif
+
+        _Bool sleep = 1;
 
         if(record_on) {
             _Bool frame = 0;
@@ -633,19 +705,27 @@ static void audio_thread(void *args)
                 if(samples >= perframe) {
                     alcCaptureSamples(device_in, buf, perframe);
                     frame = 1;
+                    if (samples >= perframe * 2) {
+                        sleep = 0;
+                    }
                 }
             }
 
             if(frame) {
+#ifdef AUDIO_FILTERING
+                if (f_a && filter_audio(f_a, (int16_t*)buf, perframe) == -1) {
+                    debug("filter audio error\n");
+                }
+#endif
                 if(preview) {
-                    sourceplaybuffer(0, (int16_t*)buf, perframe, 1, av_DefaultSettings.audio_sample_rate);
+                    sourceplaybuffer(0, (int16_t*)buf, perframe, av_DefaultSettings.audio_channels, av_DefaultSettings.audio_sample_rate);
                 }
 
                 int i;
                 for(i = 0; i < MAX_CALLS; i++) {
                     if(call[i]) {
                         int r;
-                        if((r = toxav_prepare_audio_frame(av, i, dest, perframe * 2, (void*)buf, perframe)) < 0) {
+                        if((r = toxav_prepare_audio_frame(av, i, dest, sizeof(dest), (void*)buf, perframe)) < 0) {
                             debug("toxav_prepare_audio_frame error %i\n", r);
                             continue;
                         }
@@ -655,10 +735,25 @@ static void audio_thread(void *args)
                         }
                     }
                 }
+
+                Tox *tox = toxav_get_tox(av);
+                uint32_t num_chats = tox_count_chatlist(tox);
+
+                if (num_chats != 0) {
+                    int32_t chats[num_chats];
+                    uint32_t max = tox_get_chatlist(tox, chats, num_chats);
+                    for (i = 0; i < max; ++i) {
+                        if (groups_audio[chats[i]]) {
+                            toxav_group_send_audio(tox, chats[i], (int16_t *)buf, perframe, av_DefaultSettings.audio_channels, av_DefaultSettings.audio_sample_rate);
+                        }
+                    }
+                }
             }
         }
 
-        yieldcpu(5);
+        if (sleep) {
+            yieldcpu(5);
+        }
     }
 
     //missing some cleanup ?
@@ -681,7 +776,7 @@ static void audio_thread(void *args)
     audio_thread_init = 0;
 }
 
-static void callback_av_audio(ToxAv *av, int32_t call_index, int16_t *data, int samples, void *UNUSED(userdata))
+static void callback_av_audio(void *av, int32_t call_index, const int16_t *data, uint16_t samples, void *UNUSED(userdata))
 {
     ToxAvCSettings dest;
     if(toxav_get_peer_csettings(av, call_index, 0, &dest) == 0) {
@@ -702,6 +797,63 @@ void toxaudio_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *d
 
     audio_thread_msg = 1;
 }
+
+void callback_av_group_audio(Tox *tox, int groupnumber, int peernumber, const int16_t *pcm, unsigned int samples,
+                                    uint8_t channels, unsigned int sample_rate, void *userdata)
+{
+    GROUPCHAT *g = &group[groupnumber];
+
+    uint64_t time = get_time();
+
+    if (time - g->last_recv_audio[peernumber] > (uint64_t)1 * 1000 * 1000 * 1000) {
+        postmessage(GROUP_UPDATE, groupnumber, peernumber, NULL);
+    }
+
+    g->last_recv_audio[peernumber] = time;
+
+    if(!channels || channels > 2 || g->muted) {
+        return;
+    }
+
+    ALuint bufid;
+    ALint processed = 0, queued = 16;
+    alGetSourcei(g->source[peernumber], AL_BUFFERS_PROCESSED, &processed);
+    alGetSourcei(g->source[peernumber], AL_BUFFERS_QUEUED, &queued);
+    alSourcei(g->source[peernumber], AL_LOOPING, AL_FALSE);
+
+    if(processed) {
+        ALuint bufids[processed];
+        alSourceUnqueueBuffers(g->source[peernumber], processed, bufids);
+        alDeleteBuffers(processed - 1, bufids + 1);
+        bufid = bufids[0];
+    } else if(queued < 16) {
+        alGenBuffers(1, &bufid);
+    } else {
+        debug("dropped audio frame %i %i\n", groupnumber, peernumber);
+        return;
+    }
+
+    alBufferData(bufid, (channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16, pcm, samples * 2 * channels, sample_rate);
+    alSourceQueueBuffers(g->source[peernumber], 1, &bufid);
+
+    ALint state;
+    alGetSourcei(g->source[peernumber], AL_SOURCE_STATE, &state);
+    if(state != AL_PLAYING) {
+        alSourcePlay(g->source[peernumber]);
+        debug("Starting source %i %i\n", groupnumber, peernumber);
+    }
+}
+
+void group_av_peer_add(GROUPCHAT *g, int peernumber)
+{
+    alGenSources(1, &g->source[peernumber]);
+}
+
+void group_av_peer_remove(GROUPCHAT *g, int peernumber)
+{
+    alDeleteSources(1, &g->source[peernumber]);
+}
+
 #else
 static void audio_thread(void *args)
 {
@@ -748,7 +900,35 @@ static void callback_av_audio(ToxAv *av, int32_t call_index, int16_t *data, int 
 }
 #endif
 
-static void callback_av_video(ToxAv *av, int32_t call_index, vpx_image_t *img, void *UNUSED(userdata))
+static void toxav_thread(void *args)
+{
+    ToxAv *av = args;
+
+    toxav_thread_init = 1;
+
+    debug("Toxav thread init\n");
+    while (1) {
+        if(toxav_thread_msg) {
+            TOX_MSG *msg = &toxav_msg;
+            if(msg->msg == TOXAV_KILL) {
+                break;
+            }
+            /*
+            switch(m->msg) {
+            }*/
+            toxav_thread_msg = 0;
+        }
+
+        toxav_do(av);
+        yieldcpu(toxav_do_interval(av));
+    }
+
+    debug("Toxav thread die\n");
+    toxav_thread_msg = 0;
+    toxav_thread_init = 0;
+}
+
+static void callback_av_video(void *av, int32_t call_index, const vpx_image_t *img, void *UNUSED(userdata))
 {
     /* copy the vpx_image */
     uint16_t *img_data = malloc(4 + img->d_w * img->d_h * 4);
@@ -768,13 +948,12 @@ static void set_av_callbacks(ToxAv *av)
     toxav_register_callstate_callback(av, callback_av_end, av_OnEnd, NULL);
 
     toxav_register_callstate_callback(av, callback_av_ringing, av_OnRinging, NULL);
-    toxav_register_callstate_callback(av, callback_av_starting, av_OnStarting, NULL);
-    toxav_register_callstate_callback(av, callback_av_ending, av_OnEnding, NULL);
 
     toxav_register_callstate_callback(av, callback_av_requesttimeout, av_OnRequestTimeout, NULL);
     toxav_register_callstate_callback(av, callback_av_peertimeout, av_OnPeerTimeout, NULL);
-    toxav_register_callstate_callback(av, callback_av_mediachange, av_OnMediaChange, NULL);
+    toxav_register_callstate_callback(av, callback_av_selfmediachange, av_OnSelfCSChange, NULL);
+    toxav_register_callstate_callback(av, callback_av_peermediachange, av_OnPeerCSChange, NULL);
 
-    toxav_register_audio_recv_callback(av, callback_av_audio, NULL);
-    toxav_register_video_recv_callback(av, callback_av_video, NULL);
+    toxav_register_audio_callback(av, callback_av_audio, NULL);
+    toxav_register_video_callback(av, callback_av_video, NULL);
 }

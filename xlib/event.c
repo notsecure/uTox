@@ -82,7 +82,7 @@ _Bool doevent(XEvent event)
     }
 
     case LeaveNotify: {
-        panel_mleave(&panel_main);
+        ui_mouseleave();
     }
 
     case MotionNotify: {
@@ -223,9 +223,11 @@ _Bool doevent(XEvent event)
 
                             uint16_t w = img->width;
                             uint16_t h = img->height;
-                            Picture pic = image_to_picture(img);
 
-                            friend_sendimage(f, pic, w, h, (UTOX_PNG_IMAGE)out, size);
+                            UTOX_NATIVE_IMAGE *image = malloc(sizeof(UTOX_NATIVE_IMAGE));
+                            image->rgb = ximage_to_picture(img, NULL);
+                            image->alpha = None;
+                            friend_sendimage(f, image, w, h, (UTOX_PNG_IMAGE)out, size);
                         }
                     }
                 } else {
@@ -270,28 +272,32 @@ _Bool doevent(XEvent event)
                 }
             }
 
-            if(sym == XK_KP_Enter){
+            if (sym == XK_KP_Enter){
                 sym = XK_Return;
             }
 
-            if(sym == XK_Return && (ev->state & 1)) {
+            if (sym == XK_ISO_Left_Tab) {
+                sym = XK_Tab;
+            }
+
+            if (sym == XK_Return && (ev->state & 1)) {
                 edit_char('\n', 0, 0);
                 break;
             }
 
-            if(sym == XK_KP_Space) {
+            if (sym == XK_KP_Space) {
                 sym = XK_space;
             }
 
-            if(sym >= XK_KP_Home && sym <= XK_KP_Begin) {
+            if (sym >= XK_KP_Home && sym <= XK_KP_Begin) {
                 sym -= 0x45;
             }
 
-            if(sym >= XK_KP_Multiply && sym <= XK_KP_Equal) {
+            if (sym >= XK_KP_Multiply && sym <= XK_KP_Equal) {
                 sym -= 0xFF80;
             }
 
-            if(!sym) {
+            if (!sym) {
               int i;
               for(i = 0; i < len; i++)
                 edit_char(buffer[i], (ev->state & 4) != 0, ev->state);

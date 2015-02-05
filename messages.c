@@ -17,6 +17,32 @@ static FRIEND* get_typers(MESSAGES *m) {
     return NULL;
 }
 
+/* draws an inline image at rect (x,y,width,height)
+ *  maxwidth is maximum width the image can take in
+ *  zoom is whether the image is currently zoomed in
+ *  position is the y position along the image the player has scrolled */
+static void draw_message_image(UTOX_NATIVE_IMAGE *image, int x, int y, uint32_t width, uint32_t height, uint32_t maxwidth, _Bool zoom, double position)
+{
+    if(!zoom && width > maxwidth) {
+        image_set_scale(image, (double)maxwidth / width);
+
+        draw_image(image, x, y, maxwidth, height * maxwidth / width, 0, 0);
+
+        image_set_scale(image, 1.0);
+    } else {
+        if(width > maxwidth) {
+            draw_image(image, x, y, maxwidth, height, (int)((double)(width - maxwidth) * position), 0);
+        } else {
+            draw_image(image, x, y, width, height, 0, 0);
+        }
+    }
+}
+
+/** Formats all messages from self and friends, and then call draw functions
+ * to write them to the UI.
+ *
+ * accepts: messages struct *pointer, int x,y positions, int width,height
+ */
 void messages_draw(MESSAGES *m, int x, int y, int width, int height)
 {
     setcolor(0);
@@ -53,9 +79,10 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             drawtext(x + width - TIME_WIDTH, y, (char_t*)timestr, len);
         }
 
+        // Draw the names for groups or friends
         if(m->type) {
             /* group */
-            setcolor(0);
+            setcolor(C_BLUE);
             setfont(FONT_TEXT);
             drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, &msg->msg[msg->length] + 1, msg->msg[msg->length]);
         } else {
@@ -101,6 +128,12 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
                 h2 = STRING_IDX_MAX;
             }
 
+            if (msg->msg_type == MSG_TYPE_ACTION_TEXT) {
+                setcolor(C_BLUE);
+            } else {
+                setcolor(0);
+            }
+
             setfont(FONT_TEXT);
             int ny = drawtextmultiline(x + MESSAGES_X, x + width - TIME_WIDTH, y, y, y + msg->height, font_small_lineheight, msg->msg, msg->length, h1, h2 - h1, 1);
             if(ny < y || (uint32_t)(ny - y) + MESSAGES_SPACING != msg->height) {
@@ -115,7 +148,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             /* image */
             MSG_IMG *img = (void*)msg;
             int maxwidth = width - MESSAGES_X - TIME_WIDTH;
-            drawimage(img->image, x + MESSAGES_X, y, img->w, img->h, maxwidth, img->zoom, img->position);
+            draw_message_image(img->image, x + MESSAGES_X, y, img->w, img->h, maxwidth, img->zoom, img->position);
             y += (img->zoom || img->w <= maxwidth) ? img->h : img->h * maxwidth / img->w;
             break;
         }
@@ -262,7 +295,12 @@ _Bool messages_mmove(MESSAGES *m, int UNUSED(px), int UNUSED(py), int width, int
             case MSG_TYPE_ACTION_TEXT: {
                 /* normal message */
                 m->over = hittextmultiline(mx - MESSAGES_X, width - MESSAGES_X - TIME_WIDTH, my < 0 ? 0 : my, msg->height, font_small_lineheight, msg->msg, msg->length, 1);
-                m->urlover = STRING_IDX_MAX;
+
+                _Bool prev_urlmdown = m->urlmdown;
+                if (m->urlover != STRING_IDX_MAX) {
+                    m->urlmdown = 0;
+                    m->urlover = STRING_IDX_MAX;
+                }
 
                 if(my < 0 || my >= dy || mx < MESSAGES_X || m->over == msg->length) {
                     break;
@@ -281,12 +319,12 @@ _Bool messages_mmove(MESSAGES *m, int UNUSED(px), int UNUSED(py), int width, int
 
                 char_t *end = msg->msg + msg->length;
                 while(str != end && *str != ' ' && *str != '\n') {
-                    if(m->urlover == STRING_IDX_MAX && end - str >= 7 && strcmp2(str, "http://") == 0) {
+                    if(( str == msg->msg || *(str - 1) == '\n' || *(str - 1) == ' ') && (m->urlover == STRING_IDX_MAX && end - str >= 7 && strcmp2(str, "http://") == 0)) {
                         cursor = CURSOR_HAND;
                         m->urlover = str - msg->msg;
                     }
 
-                    if(m->urlover == STRING_IDX_MAX && end - str >= 8 && strcmp2(str, "https://") == 0) {
+                    if(( str == msg->msg || *(str - 1) == '\n' || *(str - 1) == ' ') && (m->urlover == STRING_IDX_MAX && end - str >= 8 && strcmp2(str, "https://") == 0)) {
                         cursor = CURSOR_HAND;
                         m->urlover = str - msg->msg;
                     }
@@ -296,6 +334,7 @@ _Bool messages_mmove(MESSAGES *m, int UNUSED(px), int UNUSED(py), int width, int
 
                 if(m->urlover != STRING_IDX_MAX) {
                     m->urllen = (str - msg->msg) - m->urlover;
+                    m->urlmdown = prev_urlmdown;
                 }
 
                 break;
@@ -433,11 +472,7 @@ _Bool messages_mdown(MESSAGES *m)
         case MSG_TYPE_TEXT:
         case MSG_TYPE_ACTION_TEXT: {
             if(m->urlover != STRING_IDX_MAX) {
-                char_t url[m->urllen + 1];
-                memcpy(url, msg->msg + m->urlover, m->urllen * sizeof(char_t));
-                url[m->urllen] = 0;
-
-                openurl(url);
+                m->urlmdown = 1;
             }
 
             m->data->istart = m->data->iend = m->idown = m->iover;
@@ -618,8 +653,21 @@ _Bool messages_mwheel(MESSAGES *UNUSED(m), int UNUSED(height), double UNUSED(d))
 }
 
 
-_Bool messages_mup(MESSAGES *m)
-{
+_Bool messages_mup(MESSAGES *m){
+
+    if(m->iover != MSG_IDX_MAX) {
+        MESSAGE *msg = m->data->data[m->iover];
+        if(msg->msg_type == MSG_TYPE_TEXT){
+            if(m->urlover != STRING_IDX_MAX && m->urlmdown) {
+                char_t url[m->urllen + 1];
+                memcpy(url, msg->msg + m->urlover, m->urllen * sizeof(char_t));
+                url[m->urllen] = 0;
+                openurl(url);
+                m->urlmdown = 0;
+            }
+        }
+    }
+
     //temporary, change this
     if(m->select) {
         char_t *lel = malloc(65536); //TODO: De-hardcode this value.
@@ -652,7 +700,7 @@ int messages_selection(MESSAGES *m, void *buffer, uint32_t len, _Bool names)
 
     char_t *p = buffer;
 
-    while(i != n) {
+    while(i != MSG_IDX_MAX && i != n) {
         MESSAGE *msg = *dp++;
 
         if(names && (i != m->data->istart || m->data->start == 0)) {
@@ -838,6 +886,13 @@ void message_updateheight(MESSAGES *m, MESSAGE *msg, MSG_DATA *p)
     }
 }
 
+/** Appends a messages from self or firend to the message list;
+ * will realloc or trim messages as needed;
+ *
+ * also handels auto scrolling selections with messages
+ *
+ * accepts: MESSAGES *pointer, MESSAGE *pointer, MSG_DATA *pointer
+ */
 void message_add(MESSAGES *m, MESSAGE *msg, MSG_DATA *p)
 {
     time_t rawtime;
@@ -845,6 +900,7 @@ void message_add(MESSAGES *m, MESSAGE *msg, MSG_DATA *p)
     time(&rawtime);
     ti = localtime(&rawtime);
 
+    // Set the time this message was recived by utox
     msg->time = ti->tm_hour * 60 + ti->tm_min;
 
     if(p->n < MAX_BACKLOG_MESSAGES) {
@@ -940,13 +996,37 @@ _Bool messages_char(uint32_t ch)
 void message_free(MESSAGE *msg)
 {
     switch(msg->msg_type) {
-    case MSG_TYPE_IMAGE:
-        //TODO: freeimage
+    case MSG_TYPE_IMAGE: {
+        MSG_IMG *img = (void*)msg;
+        image_free(img->image);
         break;
-    case MSG_TYPE_FILE:
+    }
+    case MSG_TYPE_FILE: {
         //already gets free()d
         //free(((MSG_FILE*)msg)->path);
         break;
     }
+    }
     free(msg);
+}
+
+void message_clear(MESSAGES *m, MSG_DATA *p)
+{
+    MSG_IDX i;
+
+    for(i = 0; i < p->n; i++)
+    {
+        message_free((MESSAGE*)p->data[i]);
+    }
+
+    free(p->data);
+    p->data = NULL;
+    p->n = 0;
+
+    p->istart = p->iend = p->start = p->end = 0;
+
+    p->height = 0;
+    if(m->data == p) {
+        m->panel.content_scroll->content_height = p->height;
+    }
 }

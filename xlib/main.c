@@ -74,6 +74,7 @@ uint32_t scolor;
 Atom XA_CLIPBOARD, XA_UTF8_STRING, targets, XA_INCR;
 Atom XdndAware, XdndEnter, XdndLeave, XdndPosition, XdndStatus, XdndDrop, XdndSelection, XdndDATA, XdndActionCopy;
 Atom XA_URI_LIST, XA_PNG_IMG;
+Atom XRedraw;
 
 Pixmap drawbuf;
 Picture renderpic;
@@ -92,6 +93,8 @@ void *libgtk;
 #include "gtk.c"
 
 #include "freetype.c"
+
+_Bool utox_portable;
 
 struct
 {
@@ -175,6 +178,47 @@ void postmessage(uint32_t msg, uint16_t param1, uint16_t param2, void *data)
     XFlush(display);
 }
 
+void image_set_scale(UTOX_NATIVE_IMAGE *image, double scale)
+{
+    uint32_t r = (uint32_t)(65536.0 / scale);
+
+    /* transformation matrix to scale image */
+    XTransform trans = {
+        {{r, 0, 0},
+         {0, r, 0},
+         {0, 0, 65536}}
+    };
+    XRenderSetPictureTransform(display, image->rgb, &trans);
+    if (image->alpha) {
+        XRenderSetPictureTransform(display, image->alpha, &trans);
+    }
+}
+
+void image_set_filter(UTOX_NATIVE_IMAGE *image, uint8_t filter)
+{
+    const char *xfilter;
+    switch (filter) {
+    case FILTER_NEAREST:
+        xfilter = FilterNearest;
+        break;
+    case FILTER_BILINEAR:
+        xfilter = FilterBilinear;
+        break;
+    default:
+        debug("Warning: Tried to set image to unrecognized filter(%u).\n", filter);
+        return;
+    }
+    XRenderSetPictureFilter(display, image->rgb, xfilter, NULL, 0);
+    if (image->alpha) {
+        XRenderSetPictureFilter(display, image->alpha, xfilter, NULL, 0);
+    }
+}
+
+void draw_image(const UTOX_NATIVE_IMAGE *image, int x, int y, uint32_t width, uint32_t height, uint32_t imgx, uint32_t imgy)
+{
+    XRenderComposite(display, PictOpOver, image->rgb, image->alpha, renderpic, imgx, imgy, imgx, imgy, x, y, width, height);
+}
+
 void drawalpha(int bm, int x, int y, int width, int height, uint32_t color)
 {
     XRenderColor xrcolor = {
@@ -189,37 +233,6 @@ void drawalpha(int bm, int x, int y, int width, int height, uint32_t color)
     XRenderComposite(display, PictOpOver, src, bitmap[bm], renderpic, 0, 0, 0, 0, x, y, width, height);
 
     XRenderFreePicture(display, src);
-}
-
-void drawimage(UTOX_NATIVE_IMAGE data, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position)
-{
-    Picture bm = data;
-    if(!zoom && width > maxwidth) {
-        uint32_t v = (width * 65536) / maxwidth;
-        XTransform trans = {
-            {{v, 0, 0},
-            {0, v, 0},
-            {0, 0, 65536}}
-        };
-        XRenderSetPictureTransform(display, bm, &trans);
-        XRenderSetPictureFilter(display, bm, FilterBilinear, NULL, 0);
-
-        XRenderComposite(display, PictOpSrc, bm, None, renderpic, 0, 0, 0, 0, x, y, maxwidth, height * maxwidth / width);
-
-        XTransform trans2 = {
-            {{65536, 0, 0},
-            {0, 65536, 0},
-            {0, 0, 65536}}
-        };
-        XRenderSetPictureFilter(display, bm, FilterNearest, NULL, 0);
-        XRenderSetPictureTransform(display, bm, &trans2);
-    } else {
-        if(width > maxwidth) {
-            XRenderComposite(display, PictOpSrc, bm, None, renderpic, (int)((double)(width - maxwidth) * position), 0, 0, 0, x, y, maxwidth, height);
-        } else {
-            XRenderComposite(display, PictOpSrc, bm, None, renderpic, 0, 0, 0, 0, x, y, width, height);
-        }
-    }
 }
 
 static int _drawtext(int x, int xmax, int y, char_t *str, STRING_IDX length)
@@ -404,6 +417,13 @@ void openfilesend(void)
     }
 }
 
+void openfileavatar(void)
+{
+    if(libgtk) {
+        gtk_openfileavatar();
+    }
+}
+
 void savefilerecv(uint32_t fid, MSG_FILE *file)
 {
     if(libgtk) {
@@ -563,7 +583,7 @@ static void pastedata(void *data, Atom type, int len, _Bool select)
    if (type == XA_PNG_IMG) {
         uint16_t width, height;
 
-        UTOX_NATIVE_IMAGE native_image = png_to_image(data, size, &width, &height);
+        UTOX_NATIVE_IMAGE *native_image = png_to_image(data, size, &width, &height, 0);
         if (UTOX_NATIVE_IMAGE_IS_VALID(native_image)) {
             debug("Pasted image: %dx%d\n", width, height);
 
@@ -580,69 +600,113 @@ static void pastedata(void *data, Atom type, int len, _Bool select)
     }
 }
 
-void loadalpha(int bm, void *data, int width, int height)
+// converts an XImage to a Picture usable by XRender, uses XRenderPictFormat given by
+// 'format', uses the default format if it is NULL
+static Picture ximage_to_picture(XImage *img, const XRenderPictFormat *format)
 {
-    Pixmap pixmap = XCreatePixmap(display, window, width, height, 8);
-    XImage *img = XCreateImage(display, CopyFromParent, 8, ZPixmap, 0, data, width, height, 8, 0);
-    GC legc = XCreateGC(display, pixmap, 0, NULL);
-    XPutImage(display, pixmap, legc, img, 0, 0, 0, 0, width, height);
-
-    Picture picture = XRenderCreatePicture(display, pixmap, XRenderFindStandardFormat(display, PictStandardA8), 0, NULL);
-
-    XFreeGC(display, legc);
-    XFreePixmap(display, pixmap);
-
-    bitmap[bm] = picture;
-}
-
-static Picture image_to_picture(XImage *img)
-{
-    Pixmap pixmap = XCreatePixmap(display, window, img->width, img->height, 24);
+    Pixmap pixmap = XCreatePixmap(display, window, img->width, img->height, img->depth);
     GC legc = XCreateGC(display, pixmap, 0, NULL);
     XPutImage(display, pixmap, legc, img, 0, 0, 0, 0, img->width, img->height);
 
-    Picture picture = XRenderCreatePicture(display, pixmap, XRenderFindVisualFormat(display, visual), 0, NULL);
+    if (format == NULL) {
+        format = XRenderFindVisualFormat(display, visual);
+    }
+    Picture picture = XRenderCreatePicture(display, pixmap, format, 0, NULL);
 
     XFreeGC(display, legc);
     XFreePixmap(display, pixmap);
-    //XDestroyImage(img);
 
     return picture;
 }
 
-UTOX_NATIVE_IMAGE png_to_image(UTOX_PNG_IMAGE data, size_t size, uint16_t *w, uint16_t *h)
+void loadalpha(int bm, void *data, int width, int height)
 {
-    uint8_t *out;
+    XImage *img = XCreateImage(display, CopyFromParent, 8, ZPixmap, 0, data, width, height, 8, 0);
+
+    // create picture that only holds alpha values
+    // NOTE: the XImage made earlier should really be freed, but calling XDestroyImage on it will also
+    // automatically free the data it's pointing to(which we don't want), so there's no easy way to destroy them currently
+    bitmap[bm] = ximage_to_picture(img, XRenderFindStandardFormat(display, PictStandardA8));
+}
+
+
+/* generates an alpha bitmask based on the alpha channel in given rgba_data
+ * returned picture will have 1 byte for each pixel, and have the same width and height as input
+ */
+static Picture generate_alpha_bitmask(const uint8_t *rgba_data, uint16_t width, uint16_t height, uint32_t rgba_size)
+{
+    // we don't need to free this, that's done by XDestroyImage()
+    uint8_t *out = malloc(rgba_size / 4);
+    uint32_t i, j;
+    for (i = j = 0; i < rgba_size; i += 4, j++) {
+        out[j] = (rgba_data+i)[3] & 0xFF; // take only alpha values
+    }
+
+    // create 1-byte-per-pixel image and convert it to a Alpha-format Picture
+    XImage *img = XCreateImage(display, CopyFromParent, 8, ZPixmap, 0, (char*)out, width, height, 8, width);
+    Picture picture = ximage_to_picture(img, XRenderFindStandardFormat(display, PictStandardA8));
+
+    XDestroyImage(img);
+
+    return picture;
+}
+
+UTOX_NATIVE_IMAGE *png_to_image(const UTOX_PNG_IMAGE data, size_t size, uint16_t *w, uint16_t *h, _Bool keep_alpha)
+{
+    uint8_t *rgba_data;
     unsigned width, height;
-    unsigned r = lodepng_decode32(&out, &width, &height, data->png_data, size);
-    //free(data);
+    unsigned r = lodepng_decode32(&rgba_data, &width, &height, data->png_data, size);
 
     if(r != 0 || !width || !height) {
-        return None;
+        return None; // invalid png data
     }
 
+    uint32_t rgba_size = width * height * 4;
+
+    // we don't need to free this, that's done by XDestroyImage()
+    uint8_t *out = malloc(rgba_size);
+
+    // colors are read into red, blue and green and written into the target pointer
     uint8_t red, blue, green;
-    uint8_t *p, *end = out + width * height * 4;
-    uint32_t *temp;
+    uint32_t *target;
 
-    for (p = out; p != end; p += 4) {
-        red = p[0] & 0xFF;
-        green = p[1] & 0xFF;
-        blue = p[2] & 0xFF;
+    uint32_t i;
+    for (i = 0; i < rgba_size; i += 4) {
+        red = (rgba_data+i)[0] & 0xFF;
+        green = (rgba_data+i)[1] & 0xFF;
+        blue = (rgba_data+i)[2] & 0xFF;
 
-        temp = (uint32_t *)p;
-        *temp = (red | (red << 8) | (red << 16) | (red << 24)) & visual->red_mask;
-        *temp |= (blue | (blue << 8) | (blue << 16) | (blue << 24)) & visual->blue_mask;
-        *temp |= (green | (green << 8) | (green << 16) | (green << 24)) & visual->green_mask;
+        target = (uint32_t *)(out+i);
+        *target = (red | (red << 8) | (red << 16) | (red << 24)) & visual->red_mask;
+        *target |= (blue | (blue << 8) | (blue << 16) | (blue << 24)) & visual->blue_mask;
+        *target |= (green | (green << 8) | (green << 16) | (green << 24)) & visual->green_mask;
     }
+
+    XImage *img = XCreateImage(display, visual, 24, ZPixmap, 0, (char*)out, width, height, 32, width * 4);
+
+    Picture rgb = ximage_to_picture(img, NULL);
+    Picture alpha = (keep_alpha) ? generate_alpha_bitmask(rgba_data, width, height, rgba_size) : None;
+
+    free(rgba_data);
 
     *w = width;
     *h = height;
-    XImage *img = XCreateImage(display, visual, 24, ZPixmap, 0, (char*)out, width, height, 32, width * 4);
-    Picture picture = image_to_picture(img);
-    free(out);
 
-    return picture;
+    UTOX_NATIVE_IMAGE *image = malloc(sizeof(UTOX_NATIVE_IMAGE));
+    image->rgb = rgb;
+    image->alpha = alpha;
+
+    XDestroyImage(img);
+    return image;
+}
+
+void image_free(UTOX_NATIVE_IMAGE *image)
+{
+    XRenderFreePicture(display, image->rgb);
+    if (image->alpha) {
+        XRenderFreePicture(display, image->alpha);
+    }
+    free(image);
 }
 
 int datapath_old(uint8_t *dest)
@@ -652,12 +716,38 @@ int datapath_old(uint8_t *dest)
 
 int datapath(uint8_t *dest)
 {
-    char *home = getenv("HOME");
-    int l = sprintf((char*)dest, "%.230s/.config/tox", home);
+    if (utox_portable) {
+        int l = sprintf((char*)dest, "./tox");
+        mkdir((char*)dest, 0700);
+        dest[l++] = '/';
+
+        return l;
+    } else {
+        char *home = getenv("HOME");
+        int l = sprintf((char*)dest, "%.230s/.config/tox", home);
+        mkdir((char*)dest, 0700);
+        dest[l++] = '/';
+
+        return l;
+    }
+}
+
+int datapath_subdir(uint8_t *dest, const char *subdir)
+{
+    int l = datapath(dest);
+    l += sprintf((char*)(dest+l), "%s", subdir);
     mkdir((char*)dest, 0700);
     dest[l++] = '/';
 
     return l;
+}
+
+/** Sets file system permissions to something slightly safer.
+ *
+ * returns 0 and 1 on sucess and failure.
+ */
+int ch_mod(uint8_t *file){
+    return chmod((char*)file, S_IRUSR | S_IWUSR);
 }
 
 void flush_file(FILE *file)
@@ -702,7 +792,7 @@ void setscale(void)
     }
 }
 
-void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length)
+void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length, uint8_t *cid)
 {
     if(havefocus) {
         return;
@@ -714,7 +804,7 @@ void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_
     #ifdef HAVE_DBUS
     char_t *str = tohtml(msg, msg_length);
 
-    dbus_notify((char*)title, (char*)str);
+    dbus_notify((char*)title, (char*)str, (uint8_t*)cid);
 
     free(str);
     #endif
@@ -728,6 +818,27 @@ void showkeyboard(_Bool show)
 void redraw(void)
 {
     _redraw = 1;
+}
+void force_redraw(void) {
+    XEvent ev = {
+        .xclient = {
+            .type = ClientMessage,
+            .display = display,
+            .window = window,
+            .message_type = XRedraw,
+            .format = 8,
+            .data = {
+                .s = {0,0}
+            }
+        }
+    };
+    _redraw = 1;
+    XSendEvent(display, window, 0, 0, &ev);
+    XFlush(display);
+}
+
+void update_tray(void)
+{
 }
 
 #include "event.c"
@@ -760,6 +871,12 @@ int main(int argc, char *argv[])
     if(argc == 2 && argv[1]) {
         if(!strcmp(argv[1], "--version")) {
             debug("%s\n", VERSION);
+            return 0;
+        } else if(!strcmp(argv[1], "--portable")) {
+            debug("Launching uTox in portable mode: All data will be saved to the tox folder in the current working directory\n");
+            utox_portable = 1;
+        } else {
+            debug("Valid arguments are: --version and --portable (launches uTox in portable mode)\n");
             return 0;
         }
     }
@@ -799,6 +916,11 @@ int main(int argc, char *argv[])
     /* create window */
     window = XCreateWindow(display, RootWindow(display, screen), save->window_x, save->window_y, save->window_width, save->window_height, 0, depth, InputOutput, visual, CWBackPixmap | CWBorderPixel | CWEventMask, &attrib);
 
+    /* choose available libraries for optional UI stuff */
+    if(!(libgtk = gtk_load())) {
+        //try Qt
+    }
+
     /* start the tox thread */
     thread(tox_thread, NULL);
 
@@ -828,6 +950,8 @@ int main(int argc, char *argv[])
     XA_URI_LIST = XInternAtom(display, "text/uri-list", False);
     XA_PNG_IMG = XInternAtom(display, "image/png", False);
 
+    XRedraw = XInternAtom(display, "XRedraw", False);
+
     /* create the draw buffer */
     drawbuf = XCreatePixmap(display, window, DEFAULT_WIDTH, DEFAULT_HEIGHT, depth);
 
@@ -846,13 +970,13 @@ int main(int argc, char *argv[])
     Atom dndversion = 3;
     XChangeProperty(display, window, XdndAware, XA_ATOM, 32, PropModeReplace, (uint8_t*)&dndversion, 1);
 
+    char title_name[128];
+    snprintf(title_name, 128, "%s %s (version: %s)", TITLE, SUB_TITLE, VERSION);
+    // Effett, I give up! No OS can agree how to handle non ascii bytes, so effemm!
+    // may be needed when uTox becomes muTox
+    //memmove(title_name, title_name+1, strlen(title_name))
     /* set the window name */
-    XSetStandardProperties(display, window, "uTox", "uTox", None, argv, argc, None);
-
-    /* choose available libraries for optional UI stuff */
-    if(!(libgtk = gtk_load())) {
-        //try Qt
-    }
+    XSetStandardProperties(display, window, title_name, "uTox", None, argv, argc, None);
 
     /* initialize fontconfig */
     initfonts();
@@ -953,6 +1077,7 @@ int main(int argc, char *argv[])
 
     toxaudio_postmessage(AUDIO_KILL, 0, 0, NULL);
     toxvideo_postmessage(VIDEO_KILL, 0, 0, NULL);
+    toxav_postmessage(TOXAV_KILL, 0, 0, NULL);
     tox_postmessage(TOX_KILL, 0, 0, NULL);
 
     /* free client thread stuff */
@@ -1044,10 +1169,10 @@ void video_frame(uint32_t id, uint8_t *img_data, uint16_t width, uint16_t height
     }
 
 
-    GC gc = DefaultGC(display, screen);
+    GC default_gc = DefaultGC(display, screen);
     Pixmap pixmap = XCreatePixmap(display, window, attrs.width, attrs.height, 24);
-    XPutImage(display, pixmap, gc, &image, 0, 0, 0, 0, attrs.width, attrs.height);
-    XCopyArea(display, pixmap, video_win[id], gc, 0, 0, attrs.width, attrs.height, 0, 0);
+    XPutImage(display, pixmap, default_gc, &image, 0, 0, 0, 0, attrs.width, attrs.height);
+    XCopyArea(display, pixmap, video_win[id], default_gc, 0, 0, attrs.width, attrs.height, 0, 0);
     XFreePixmap(display, pixmap);
     free(new_data);
 }

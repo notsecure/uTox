@@ -78,6 +78,10 @@ _Bool button_mmove(BUTTON *b, int UNUSED(x), int UNUSED(y), int width, int heigh
     _Bool mouseover = inrect(mx, my, real_x, 0, real_w, height);
     if(mouseover) {
         cursor = CURSOR_HAND;
+        if(maybe_i18nal_string_is_valid(&b->tooltip_text)) {
+            tooltip_new(&b->tooltip_text);
+        }
+
     }
     if(mouseover != b->mouseover) {
         b->mouseover = mouseover;
@@ -97,8 +101,13 @@ _Bool button_mdown(BUTTON *b)
     return 0;
 }
 
-_Bool button_mright(BUTTON *UNUSED(b))
+_Bool button_mright(BUTTON *b)
 {
+    if(b->mouseover && b->onright) {
+        b->onright();
+        return 1;
+    }
+
     return 0;
 }
 

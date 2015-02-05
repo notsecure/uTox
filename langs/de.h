@@ -35,7 +35,7 @@ msgid(REQ_BAD_CHECKSUM)
 msgstr("Fehler: Ungültige Tox ID (ungültige Prüfsumme)")
 
 msgid(REQ_BAD_NOSPAM)
-msgstr("Fehler: Ungültige Tox ID (bad nospam value)")
+msgstr("Fehler: Ungültige Tox ID (ungültiger NoSpam-Wert)")
 
 msgid(REQ_NO_MEMORY)
 msgstr("Fehler: Kein Speicher")
@@ -86,7 +86,7 @@ msgid(SWITCHPROFILE)
 msgstr("Profil wechseln")
 
 msgid(FRIENDREQUEST)
-msgstr("Freundesanfrage")
+msgstr("Freundschaftsanfrage")
 
 msgid(USERSETTINGS)
 msgstr("Benutzereinstellungen")
@@ -101,7 +101,10 @@ msgid(DEVICESELECTION)
 msgstr("Geräteauswahl")
 
 msgid(AUDIOINPUTDEVICE)
-msgstr("Audioquelle")
+msgstr("Audioeingabegerät")
+
+msgid(AUDIOFILTERING)
+msgstr("Audio filtern")
 
 msgid(AUDIOOUTPUTDEVICE)
 msgstr("Audioausgabegerät")
@@ -126,6 +129,9 @@ msgstr("Das Verändern von Netzwerk/Proxy-Einstellungen unterbricht die Verbindu
 
 msgid(LOGGING)
 msgstr("Chatverläufe speichern")
+
+msgid(AUDIONOTIFICATIONS)
+msgstr("Akustische Benachrichtigungen einschalten (Klingelton)")
 
 msgid(IS_TYPING)
 msgstr("schreibt...")
@@ -161,10 +167,10 @@ msgid(IGNORE)
 msgstr("Ignorieren")
 
 msgid(CLICKTOSAVE)
-msgstr("Klicke zum speichern")
+msgstr("Klicken um zu speichern")
 
 msgid(CLICKTOOPEN)
-msgstr("Klicke zum öffnen")
+msgstr("Klicken um zu öffnen")
 
 msgid(CANCELLED)
 msgstr("Abgebrochen")
@@ -199,9 +205,8 @@ msgstr("Ja")
 msgid(VIDEO_IN_NONE)
 msgstr("keine")
 
-//TODO: Localize or remove.
-//msgid(DEFAULT_FRIEND_REQUEST_MESSAGE)
-//msgstr("Please accept this friend request.")
+msgid(DEFAULT_FRIEND_REQUEST_MESSAGE)
+msgstr("Bitte füge mich deiner Kontaktliste hinzu.")
 
 msgid(CONTACTS_FILTER_EDIT_HINT)
 msgstr("Freunde suchen")
@@ -212,3 +217,17 @@ msgstr("Standard Loopback")
 msgid(WINDOW_TITLE_VIDEO_PREVIEW)
 msgstr("Video Vorschau")
 
+msgid(MUTE)
+msgstr("Stummschalten")
+
+msgid(UNMUTE)
+msgstr("Stummschaltung aufheben")
+
+msgid(AVATAR_TOO_LARGE_MAX_SIZE_IS)
+msgstr("Avatar zu groß. Maximale Größe: ")
+
+msgid(CANT_FIND_FILE_OR_EMPTY)
+msgstr("Ausgewählte Datei existiert nicht oder ist leer.")
+
+msgid(CLEAR_HISTORY)
+msgstr("Chatverlauf leeren")

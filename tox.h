@@ -10,6 +10,8 @@ enum {
     TOX_KILL,
 
     TOX_SETNAME,
+    TOX_SETAVATAR,
+    TOX_UNSETAVATAR,
     TOX_SETSTATUSMSG,
     TOX_SETSTATUS,
     TOX_ADDFRIEND,
@@ -24,11 +26,15 @@ enum {
     TOX_CALL_VIDEO,
     TOX_CALL_VIDEO_ON,
     TOX_CALL_VIDEO_OFF,
+    TOX_CANCELCALL,
     TOX_ACCEPTCALL,
     TOX_HANGUP,
     TOX_NEWGROUP,
     TOX_LEAVEGROUP,
     TOX_GROUPINVITE,
+    TOX_GROUPCHANGETOPIC,
+    TOX_GROUP_AUDIO_START,
+    TOX_GROUP_AUDIO_END,
 
     TOX_SENDFILES,
     TOX_SEND_INLINE,
@@ -59,6 +65,8 @@ enum
     AUDIO_CALL_END,
     AUDIO_PLAY_RINGTONE,
     AUDIO_STOP_RINGTONE,
+    GROUP_AUDIO_CALL_START,
+    GROUP_AUDIO_CALL_END,
 };
 
 enum
@@ -71,6 +79,11 @@ enum
     VIDEO_CALL_END,
 };
 
+
+enum
+{
+    TOXAV_KILL,
+};
 /* client thread messages (recieved by the client thread)
  */
 enum {
@@ -79,7 +92,9 @@ enum {
     DHT_CONNECTED,
     DNS_RESULT,
 
-    OPEN_FILES,
+    SET_AVATAR,
+
+    SEND_FILES,
     SAVE_FILE,
 
     NEW_AUDIO_IN_DEVICE,
@@ -93,6 +108,8 @@ enum {
     FRIEND_DEL,
     FRIEND_MESSAGE,
     FRIEND_NAME,
+    FRIEND_SETAVATAR,
+    FRIEND_UNSETAVATAR,
     FRIEND_STATUS_MESSAGE,
     FRIEND_STATUS,
     FRIEND_TYPING,
@@ -127,6 +144,10 @@ enum {
     GROUP_PEER_ADD,
     GROUP_PEER_DEL,
     GROUP_PEER_NAME,
+    GROUP_TITLE,
+    GROUP_AUDIO_START,
+    GROUP_AUDIO_END,
+    GROUP_UPDATE,
 };
 
 enum
@@ -155,6 +176,10 @@ void toxaudio_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *d
 /* send a message to the video thread
  */
 void toxvideo_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *data);
+
+/* send a message to the toxav thread
+ */
+void toxav_postmessage(uint8_t msg, uint16_t param1, uint16_t param2, void *data);
 
 /* read a message sent from the toxcore thread (sent with postmessage())
  */

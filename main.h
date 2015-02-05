@@ -15,6 +15,8 @@
 #include <limits.h>
 #include <ctype.h>
 
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <tox/tox.h>
 #include <tox/toxav.h>
 #include <vpx/vpx_codec.h>
@@ -26,7 +28,9 @@
 #define DEFAULT_STATUS "Toxing on uTox"
 #define DEFAULT_SCALE 2
 
-#define VERSION "0.1.8"
+#define TITLE "uTox"
+#define SUB_TITLE "(Alpha)"
+#define VERSION "0.2.l"
 
 #define MAX_CALLS 16
 #define MAX_BACKLOG_MESSAGES 128
@@ -39,11 +43,18 @@ typedef struct
     uint8_t proxyenable;
     uint8_t logging_enabled : 1;
     uint8_t audible_notifications_enabled : 1;
-    uint8_t zero : 6;
+    uint8_t filter : 1;
+    uint8_t audio_filtering_enabled : 1;
+    uint8_t close_to_tray : 1;
+    uint8_t start_in_tray : 1;
+    uint8_t zero : 2;
+    uint16_t audio_device_in;
+    uint16_t audio_device_out;
+    uint16_t unused[32];
     uint8_t proxy_ip[0];
 }UTOX_SAVE;
 
-#define SAVE_VERSION 2
+#define SAVE_VERSION 3
 
 typedef struct
 {
@@ -80,6 +91,7 @@ typedef struct edit_change EDIT_CHANGE;
 #include "ui.h"
 #include "svg.h"
 
+#include "avatar.h"
 #include "messages.h"
 #include "dns.h"
 #include "transfer.h"
@@ -90,27 +102,29 @@ typedef struct edit_change EDIT_CHANGE;
 #include "button.h"
 #include "dropdown.h"
 #include "contextmenu.h"
+#include "tooltip.h"
 
 #include "text.h"
 #include "util.h"
 
 #include "ui_dropdown.h"
 
-volatile _Bool tox_thread_init, audio_thread_init, video_thread_init;
+volatile _Bool tox_thread_init, audio_thread_init, video_thread_init, toxav_thread_init;
 _Bool tox_connected;
 
 _Bool audio_preview, video_preview;
 
-volatile _Bool logging_enabled;
+volatile _Bool logging_enabled, audible_notifications_enabled, audio_filtering_enabled, close_to_tray, start_in_tray;
 
-volatile _Bool audible_notifications_enabled;
+volatile uint16_t loaded_audio_in_device, loaded_audio_out_device;
 
 #define MAX_NUM_FRIENDS 256
+#define MAX_NUM_GROUPS 512
 
 //friends and groups
 //note: assumes array size will always be large enough
 FRIEND friend[MAX_NUM_FRIENDS];
-GROUPCHAT group[1024];
+GROUPCHAT group[MAX_NUM_GROUPS];
 uint32_t friends, groups;
 
 //window
@@ -206,16 +220,48 @@ enum
 void drawalpha(int bm, int x, int y, int width, int height, uint32_t color);
 void loadalpha(int bm, void *data, int width, int height);
 void desktopgrab(_Bool video);
-void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length);
+void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length, uint8_t *cid);
 void setscale(void);
-void drawimage(UTOX_NATIVE_IMAGE, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position);
-UTOX_NATIVE_IMAGE png_to_image(UTOX_PNG_IMAGE, size_t png_size, uint16_t *w, uint16_t *h);
+
+enum {
+    FILTER_NEAREST, // ugly and quick filtering
+    FILTER_BILINEAR // prettier and a bit slower filtering
+};
+/* set filtering method used when resizing given image to one of above enum */
+void image_set_filter(UTOX_NATIVE_IMAGE *image, uint8_t filter);
+
+/* set scale of image so that when it's drawn it will be `scale' times as large(2.0 for double size, 0.5 for half, etc.)
+ *  notes: theoretically lowest possible scale is (1.0/65536.0), highest is 65536.0, values outside of this range will create weird issues
+ *         scaling will be rounded to pixels, so it might not be exact
+ */
+void image_set_scale(UTOX_NATIVE_IMAGE *image, double scale);
+
+/* draws an utox image with or without alpha channel into the rect of (x,y,width,height) on the screen,
+ * starting at position (imgx,imgy) of the image
+ * WARNING: Windows can fail to show the image at all if the rect (imgx,imgy,width,height) contains even 1 pixel outside of
+ * the image's size AFTER SCALING, so be careful.
+ * TODO: improve this so this function is safer to use */
+void draw_image(const UTOX_NATIVE_IMAGE *image, int x, int y, uint32_t width, uint32_t height, uint32_t imgx, uint32_t imgy);
+
+/* converts a png to a UTOX_NATIVE_IMAGE, returns a pointer to it, keeping alpha channel only if keep_alpha is 1 */
+UTOX_NATIVE_IMAGE *png_to_image(const UTOX_PNG_IMAGE, size_t size, uint16_t *w, uint16_t *h, _Bool keep_alpha);
+
+/* free an image created by png_to_image */
+void image_free(UTOX_NATIVE_IMAGE *image);
+
 void showkeyboard(_Bool show);
 void redraw(void);
+void update_tray(void);
+void force_redraw(void); // TODO: as parameter for redraw()?
 
 int datapath_old(uint8_t *dest);
 int datapath(uint8_t *dest);
+
+/* gets a subdirectory of tox's datapath and puts the full pathname in dest,
+ * returns number of characters written */
+int datapath_subdir(uint8_t *dest, const char *subdir);
 void flush_file(FILE *file);
+int ch_mod(uint8_t *file);
 void config_osdefaults(UTOX_SAVE *r);
 
 //me
@@ -225,6 +271,7 @@ struct
     STRING_IDX name_length, statusmsg_length;
     char_t *statusmsg, name[TOX_MAX_NAME_LENGTH];
     char_t id[TOX_FRIEND_ADDRESS_SIZE * 2];
+    AVATAR avatar;
 }self;
 
 //add friend page
@@ -282,6 +329,9 @@ void paste(void);
 void address_to_clipboard(void);
 void openurl(char_t *str);
 void openfilesend(void);
+
+/* use the file chooser to pick an avatar and set it as the user's */
+void openfileavatar(void);
 void savefilerecv(uint32_t fid, MSG_FILE *file);
 void savefiledata(MSG_FILE *file);
 

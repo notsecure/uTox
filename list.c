@@ -24,13 +24,19 @@ static void drawitembox(ITEM *i, int y)
     }
 }
 
-static void drawname(ITEM *i, int y, char_t *name, char_t *msg, STRING_IDX name_length, STRING_IDX msg_length)
+static void drawname(ITEM *i, int y, char_t *name, char_t *msg, STRING_IDX name_length, STRING_IDX msg_length, _Bool color_overide, uint32_t color)
 {
-    setcolor((sitem == i) ? LIST_DARK : LIST_SELECTED);
+    if (!color_overide)
+        color = (sitem == i) ? LIST_DARK : LIST_SELECTED;
+
+    setcolor(color);
     setfont(FONT_LIST_NAME);
     drawtextwidth(LIST_NAME_X, LIST_RIGHT - LIST_NAME_X - SCALE * 16, y + LIST_NAME_Y, name, name_length);
 
-    setcolor((sitem == i) ? LIST_MAIN : C_STATUS);
+    if (!color_overide)
+        color = (sitem == i) ? LIST_MAIN : C_STATUS;
+
+    setcolor(color);
     setfont(FONT_STATUS);
     drawtextwidth(LIST_STATUS_X, LIST_RIGHT - LIST_STATUS_X - SCALE * 16, y + LIST_STATUS_Y,  msg, msg_length);
 }
@@ -38,27 +44,50 @@ static void drawname(ITEM *i, int y, char_t *name, char_t *msg, STRING_IDX name_
 static void drawitem(ITEM *i, int UNUSED(x), int y)
 {
     drawitembox(i, y);
-
     switch(i->item) {
     case ITEM_FRIEND: {
         FRIEND *f = i->data;
 
-        drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
+        // draw avatar or default image
+        if (friend_has_avatar(f)) {
+            draw_avatar_image(f->avatar.image, LIST_AVATAR_X, y + LIST_AVATAR_Y, f->avatar.width, f->avatar.height, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH);
+        } else {
+            drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
+        }
 
-        drawname(i, y, f->name, f->status_message, f->name_length, f->status_length);
+        drawname(i, y, f->name, f->status_message, f->name_length, f->status_length, 0, 0);
 
         uint8_t status = f->online ? f->status : 3;
         drawalpha(BM_ONLINE + status, LIST_RIGHT - SCALE * 12, y + ITEM_HEIGHT / 2 - BM_STATUS_WIDTH / 2, BM_STATUS_WIDTH, BM_STATUS_WIDTH, status_color[status]);
         if(f->notify) {
             drawalpha(BM_STATUS_NOTIFY, LIST_RIGHT - SCALE * 13, y + ITEM_HEIGHT / 2 - BM_STATUS_NOTIFY_WIDTH / 2, BM_STATUS_NOTIFY_WIDTH, BM_STATUS_NOTIFY_WIDTH, status_color[status]);
         }
+        // tooltip_new(utf8tonative(snprint_t(f->name, sizeof(char_t)*8));
         break;
     }
 
     case ITEM_GROUP: {
         GROUPCHAT *g = i->data;
         drawalpha(BM_GROUP, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
-        drawname(i, y, g->name, g->topic, g->name_length, g->topic_length);
+        _Bool color_overide = 0;
+        uint32_t color = 0;
+
+        if (g->muted) {
+            color_overide = 1;
+            color = C_BLUE;
+        } else {
+            uint64_t time = get_time();
+            unsigned int j;
+            for (j = 0; j < g->peers; ++j) {
+                if (time - g->last_recv_audio[j] <= (uint64_t)1 * 1000 * 1000 * 1000) {
+                    color_overide = 1;
+                    color = C_RED;
+                    break;
+                }
+            }
+        }
+
+        drawname(i, y, g->name, g->topic, g->name_length, g->topic_length, color_overide, color);
         break;
     }
 
@@ -69,7 +98,7 @@ static void drawitem(ITEM *i, int UNUSED(x), int y)
         id_to_string(name, f->id);
 
         drawalpha(BM_CONTACT, LIST_AVATAR_X, y + LIST_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, (sitem == i) ? LIST_MAIN : WHITE);
-        drawname(i, y, name, f->msg, sizeof(name), f->length);
+        drawname(i, y, name, f->msg, sizeof(name), f->length, 0, 0);
         break;
     }
     }
@@ -90,10 +119,12 @@ void list_scale(void)
 
 static ITEM* item_hit(int mx, int my, int UNUSED(height))
 {
+    /* Mouse is outsite the list */
     if(mx < LIST_X || mx >= LIST_RIGHT) {
         return NULL;
     }
 
+    /* Mouse is above the list */
     if(my < 0) {
         return NULL;
     }
@@ -115,6 +146,8 @@ static void selectitem(ITEM *i)
 {
     panel_item[sitem->item - 1].disabled = 1;
     panel_item[i->item - 1].disabled = 0;
+
+    edit_resetfocus();
 
     if(sitem->item == ITEM_FRIEND) {
         FRIEND *f = sitem->data;
@@ -178,6 +211,7 @@ static void selectitem(ITEM *i)
         edit_msg.history = f->edit_history;
         edit_msg.history_cur = f->edit_history_cur;
         edit_msg.history_length = f->edit_history_length;
+        edit_setfocus(&edit_msg);
     }
 
     if(i->item == ITEM_GROUP) {
@@ -192,6 +226,7 @@ static void selectitem(ITEM *i)
         messages_group.iover = MSG_IDX_MAX;
         messages_group.panel.content_scroll->content_height = g->msg.height;
         messages_group.panel.content_scroll->d = g->msg.scroll;
+        edit_setfocus(&edit_msg);
 
         g->msg.id = g - group;
 
@@ -206,6 +241,7 @@ static void selectitem(ITEM *i)
 
     if(i->item == ITEM_ADD) {
         button_add.disabled = 1;
+        edit_setfocus(&edit_addid);
     }
 
     if(i->item == ITEM_TRANSFER) {
@@ -213,8 +249,6 @@ static void selectitem(ITEM *i)
     }
 
     sitem = i;
-
-    edit_resetfocus();
 
     addfriend_status = 0;
 
@@ -227,6 +261,7 @@ void list_start(void)
 
     item_add.item = ITEM_ADD;
     button_add.disabled = 1;
+    edit_setfocus(&edit_addid);
 
     item_settings.item = ITEM_SETTINGS;
     item_transfer.item = ITEM_TRANSFER;
@@ -332,6 +367,8 @@ void list_draw(void *UNUSED(n), int UNUSED(x), int y, int UNUSED(width), int UNU
     }
 }
 
+void group_av_peer_remove(GROUPCHAT *g, int peernumber);
+
 static void deleteitem(ITEM *i)
 {
     ritem = NULL;
@@ -359,6 +396,18 @@ static void deleteitem(ITEM *i)
         GROUPCHAT *g = i->data;
 
         tox_postmessage(TOX_LEAVEGROUP, (g - group), 0, NULL);
+
+        unsigned int j;
+        for (j = 0; j < g->peers; ++j) {
+            if(g->peername[j]) {
+                free(g->peername[j]);
+                g->peername[j] = NULL;
+            }
+
+            group_av_peer_remove(g, j);
+        }
+
+        toxaudio_postmessage(GROUP_AUDIO_CALL_END, (g - group), 0, NULL);
 
         group_free(g);
         break;
@@ -467,6 +516,8 @@ _Bool list_mmove(void *UNUSED(n), int UNUSED(x), int UNUSED(y), int UNUSED(width
         }
 
         draw = 1;
+    } else {
+        tooltip_draw();
     }
 
     return draw;
@@ -475,7 +526,7 @@ _Bool list_mmove(void *UNUSED(n), int UNUSED(x), int UNUSED(y), int UNUSED(width
 _Bool list_mdown(void *UNUSED(n))
 {
     _Bool draw = 0;
-
+    tooltip_mdown(); /* may need to return on true */
     if(mitem) {
         if(mitem != sitem) {
             selectitem(mitem);
@@ -496,12 +547,27 @@ static void contextmenu_list_onselect(uint8_t i)
         return;
     }
 
+    if (ritem->item == ITEM_FRIEND && i == 1) {
+        friend_history_clear((FRIEND*)ritem->data);
+        return;
+    }
+
+    if (ritem->item == ITEM_GROUP && i == 0) {
+        GROUPCHAT *g = ritem->data;
+        if (g->type == TOX_GROUPCHAT_TYPE_AV) {
+            g->muted = !g->muted;
+            return;
+        }
+    }
+
     list_deleteritem();
 }
 
 _Bool list_mright(void *UNUSED(n))
 {
-    static UI_STRING_ID menu_friend[] = {STR_REMOVE_FRIEND};
+    static UI_STRING_ID menu_friend[] = {STR_REMOVE_FRIEND, STR_CLEAR_HISTORY};
+    static UI_STRING_ID menu_group_unmuted[] = {STR_MUTE, STR_REMOVE_GROUP};
+    static UI_STRING_ID menu_group_muted[] = {STR_UNMUTE, STR_REMOVE_GROUP};
     static UI_STRING_ID menu_group[] = {STR_REMOVE_GROUP};
     static UI_STRING_ID menu_request[] = {STR_REQ_ACCEPT, STR_REQ_DECLINE};
 
@@ -510,7 +576,17 @@ _Bool list_mright(void *UNUSED(n))
         if(mitem->item == ITEM_FRIEND) {
             contextmenu_new(countof(menu_friend), menu_friend, contextmenu_list_onselect);
         } else if(mitem->item == ITEM_GROUP) {
-            contextmenu_new(countof(menu_group), menu_group, contextmenu_list_onselect);
+            GROUPCHAT *g = mitem->data;
+
+            if (g->type == TOX_GROUPCHAT_TYPE_AV) {
+                if (g->muted) {
+                    contextmenu_new(countof(menu_group_muted), menu_group_muted, contextmenu_list_onselect);
+                } else {
+                    contextmenu_new(countof(menu_group_unmuted), menu_group_unmuted, contextmenu_list_onselect);
+                }
+            } else {
+                contextmenu_new(countof(menu_group), menu_group, contextmenu_list_onselect);
+            }
         } else {
             contextmenu_new(countof(menu_request), menu_request, contextmenu_list_onselect);
         }
@@ -529,6 +605,7 @@ _Bool list_mwheel(void *UNUSED(n), int UNUSED(height), double UNUSED(d))
 _Bool list_mup(void *UNUSED(n))
 {
     _Bool draw = 0;
+    tooltip_mup(); /* may need to return one true */
     if(sitem_mousedown && abs(sitem_dy) >= 5) {
         if(nitem) {
             if(sitem->item == ITEM_FRIEND) {

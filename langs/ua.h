@@ -46,9 +46,6 @@ msgstr("Передача файлу")
 msgid(TRANSFER_STARTED)
 msgstr("Розпочато передачу файлу")
 
-msgid(TRANSFER___)
-msgstr("...")
-
 msgid(TRANSFER_PAUSED)
 msgstr("Призупинено передачу файлу")
 

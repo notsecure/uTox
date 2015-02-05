@@ -23,6 +23,7 @@
 #define KEY_LEFT XK_Left
 #define KEY_RIGHT XK_Right
 #define KEY_TAB XK_Tab
+#define KEY_LEFT_TAB XK_ISO_Left_Tab
 #define KEY_DEL XK_Delete
 #define KEY_END XK_End
 #define KEY_HOME XK_Home
@@ -33,7 +34,12 @@
 
 #define KEY(x) (x + 'a' - 'A')
 
-// This is really a Picture, but it is just a typedef for XID, and I didn't
-// want to clutter namespace with #include <X11/extensions/Xrender.h> for it.
-typedef XID UTOX_NATIVE_IMAGE;
+typedef struct utox_native_image {
+    // This is really a Picture, but it is just a typedef for XID, and I didn't
+    // want to clutter namespace with #include <X11/extensions/Xrender.h> for it.
+    XID rgb;
+    XID alpha;
+} UTOX_NATIVE_IMAGE;
+
 #define UTOX_NATIVE_IMAGE_IS_VALID(x) (None != (x))
+#define UTOX_NATIVE_IMAGE_HAS_ALPHA(x) (None != (x->alpha))

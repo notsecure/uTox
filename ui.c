@@ -35,6 +35,26 @@ _Bool maybe_i18nal_string_is_valid(MAYBE_I18NAL_STRING *mis) {
 
 /***** MAYBE_I18NAL_STRING helpers end *****/
 
+void draw_avatar_image(UTOX_NATIVE_IMAGE *image, int x, int y, uint32_t width, uint32_t height, uint32_t targetwidth, uint32_t targetheight)
+{
+    /* get smallest of width or height */
+    double scale = (width > height) ?
+                      (double)targetheight / height :
+                      (double)targetwidth / width;
+
+    image_set_scale(image, scale);
+    image_set_filter(image, FILTER_BILINEAR);
+
+    /* set position to show the middle of the image in the center  */
+    int xpos = (int) ((double)width * scale / 2 - (double)targetwidth / 2);
+    int ypos = (int) ((double)height * scale / 2 - (double)targetheight / 2);
+
+    draw_image(image, x, y, targetwidth, targetheight, xpos, ypos);
+
+    image_set_scale(image, 1.0);
+    image_set_filter(image, FILTER_NEAREST);
+}
+
 uint32_t status_color[] = {
     C_GREEN,
     C_YELLOW,
@@ -42,6 +62,7 @@ uint32_t status_color[] = {
     C_RED
 };
 
+/* Top left self interface Avatar, name, statusmsg, status icon */
 static void drawself(void)
 {
     //40x40 self icon at 10,10
@@ -53,7 +74,12 @@ static void drawself(void)
     setfont(FONT_STATUS);
     drawtextrange(SELF_MSG_X, SELF_STATUS_X, SELF_MSG_Y, self.statusmsg, self.statusmsg_length);
 
-    drawalpha(BM_CONTACT, SELF_AVATAR_X, SELF_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, WHITE);
+    // draw avatar or default image
+    if (self_has_avatar()) {
+        draw_avatar_image(self.avatar.image, SELF_AVATAR_X, SELF_AVATAR_Y, self.avatar.width, self.avatar.height, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH);
+    } else {
+        drawalpha(BM_CONTACT, SELF_AVATAR_X, SELF_AVATAR_Y, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, WHITE);
+    }
 
     drawalpha(BM_STATUSAREA, SELF_STATUS_X, SELF_STATUS_Y, BM_STATUSAREA_WIDTH, BM_STATUSAREA_HEIGHT, button_status.mouseover ? LIST_HIGHLIGHT : LIST_MAIN);
 
@@ -61,11 +87,17 @@ static void drawself(void)
     drawalpha(BM_ONLINE + status, SELF_STATUS_X + BM_STATUSAREA_WIDTH / 2 - BM_STATUS_WIDTH / 2, SELF_STATUS_Y + BM_STATUSAREA_HEIGHT / 2 - BM_STATUS_WIDTH / 2, BM_STATUS_WIDTH, BM_STATUS_WIDTH, status_color[status]);
 }
 
+/* Header for friend chat window */
 static void drawfriend(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(height))
 {
     FRIEND *f = sitem->data;
 
-    drawalpha(BM_CONTACT, LIST_RIGHT + SCALE * 5, SCALE * 5, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, LIST_MAIN);
+    // draw avatar or default image
+    if (friend_has_avatar(f)) {
+        draw_avatar_image(f->avatar.image, LIST_RIGHT + SCALE * 5, SCALE * 5, f->avatar.width, f->avatar.height, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH);
+    } else {
+        drawalpha(BM_CONTACT, LIST_RIGHT + SCALE * 5, SCALE * 5, BM_CONTACT_WIDTH, BM_CONTACT_WIDTH, LIST_MAIN);
+    }
 
     setcolor(C_TITLE);
     setfont(FONT_TITLE);
@@ -84,16 +116,19 @@ static void drawgroup(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(he
 
     setcolor(C_TITLE);
     setfont(FONT_TITLE);
-    drawtext(LIST_RIGHT + 30 * SCALE, 5 * SCALE, g->name, g->name_length);
+    drawtext(LIST_RIGHT + 30 * SCALE, 1 * SCALE, g->name, g->name_length);
 
     setcolor(LIST_MAIN);
     setfont(FONT_STATUS);
-    drawtext(LIST_RIGHT + 30 * SCALE, 12 * SCALE, g->topic, g->topic_length);
-
+    drawtext(LIST_RIGHT + 30 * SCALE, 8 * SCALE, g->topic, g->topic_length);
 
     setcolor(GRAY(150));
     uint32_t i = 0;
     int k = LIST_RIGHT + 30 * SCALE;
+
+    uint64_t time = get_time();
+
+    unsigned int pos_y = 15;
     while(i < g->peers)
     {
         uint8_t *name = g->peername[i];
@@ -104,12 +139,25 @@ static void drawgroup(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(he
             memcpy(buf + name[0], ", ", 2);
 
             int w = textwidth(buf, name[0] + 2);
-            if(k + w >= utox_window_width) {
-                drawtext(k, 18 * SCALE, (uint8_t*)"...", 3);
-                break;
+            if (i == g->our_peer_number) {
+                setcolor(C_GREEN);
+            } else if (time - g->last_recv_audio[i] <= (uint64_t)1 * 1000 * 1000 * 1000) {
+                setcolor(C_RED);
+            } else {
+                setcolor(GRAY(150));
             }
 
-            drawtext(k, 18 * SCALE, buf, name[0] + 2);
+            if(k + w >= (utox_window_width - 32 * SCALE)) {
+                if (pos_y == 15) {
+                    pos_y += 6;
+                    k = LIST_RIGHT + 30 * SCALE;
+                } else {
+                    drawtext(k, pos_y * SCALE, (uint8_t*)"...", 3);
+                    break;
+                }
+            }
+
+            drawtext(k, pos_y * SCALE, buf, name[0] + 2);
 
             k += w;
         }
@@ -117,6 +165,7 @@ static void drawgroup(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(he
     }
 }
 
+/* Draw an invite to be a friend window */
 static void drawfriendreq(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSED(height))
 {
     FRIENDREQ *req = sitem->data;
@@ -130,6 +179,7 @@ static void drawfriendreq(int UNUSED(x), int UNUSED(y), int UNUSED(w), int UNUSE
     drawtextrange(LIST_RIGHT + 5 * SCALE, utox_window_width, 20 * SCALE, req->msg, req->length);
 }
 
+/* Draw add a friend window */
 static void drawadd(int UNUSED(x), int UNUSED(y), int UNUSED(w), int height)
 {
     setcolor(C_TITLE);
@@ -180,7 +230,7 @@ static void drawadd(int UNUSED(x), int UNUSED(y), int UNUSED(w), int height)
     }
 }
 
-
+/* Top bar for user settings */
 static void drawsettings(int UNUSED(x), int UNUSED(y), int UNUSED(width), int UNUSED(height))
 {
     setcolor(C_TITLE);
@@ -188,6 +238,8 @@ static void drawsettings(int UNUSED(x), int UNUSED(y), int UNUSED(width), int UN
     drawstr(LIST_RIGHT + SCALE * 5, SCALE * 10, USERSETTINGS);
 }
 
+/* draw switch profile top bar */
+/* Current TODO */
 static void drawtransfer(int UNUSED(x), int UNUSED(y), int UNUSED(width), int UNUSED(height))
 {
     setcolor(C_TITLE);
@@ -195,6 +247,7 @@ static void drawtransfer(int UNUSED(x), int UNUSED(y), int UNUSED(width), int UN
     drawstr(LIST_RIGHT + SCALE * 5, SCALE * 10, SWITCHPROFILE);
 }
 
+/* Text content for settings page */
 static void drawsettings_content(int UNUSED(x), int y, int UNUSED(w), int UNUSED(height))
 {
     setcolor(C_TITLE);
@@ -204,6 +257,9 @@ static void drawsettings_content(int UNUSED(x), int y, int UNUSED(w), int UNUSED
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 29, STATUSMESSAGE);
 
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 123, AUDIOINPUTDEVICE);
+#ifdef AUDIO_FILTERING
+    drawstr(LIST_RIGHT + SCALE * 190, y + SCALE * 123, AUDIOFILTERING);
+#endif
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 147, AUDIOOUTPUTDEVICE);
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 171, VIDEOINPUTDEVICE);
 
@@ -237,6 +293,10 @@ static void drawsettings_content(int UNUSED(x), int y, int UNUSED(w), int UNUSED
     setcolor(C_TITLE);
     setfont(FONT_TEXT);
     drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 334, AUDIONOTIFICATIONS);
+
+    drawstr(LIST_RIGHT + SCALE * 5, y + SCALE * 357, CLOSE_TO_TRAY);
+    drawstr(LIST_RIGHT + SCALE * 75, y + SCALE * 357, START_IN_TRAY);
+
 }
 
 static void background_draw(PANEL *UNUSED(p), int UNUSED(x), int UNUSED(y), int width, int height)
@@ -350,7 +410,8 @@ panel_settings = {
         (void*)&dropdown_audio_in, (void*)&dropdown_audio_out, (void*)&dropdown_video,
         (void*)&dropdown_dpi, (void*)&dropdown_language, (void*)&dropdown_proxy,
         (void*)&dropdown_ipv6, (void*)&dropdown_udp, (void*)&dropdown_logging,
-        (void*)&dropdown_audible_notification,
+        (void*)&dropdown_audible_notification, (void*)&dropdown_audio_filtering, 
+        (void*)&dropdown_close_to_tray, (void*)&dropdown_start_in_tray,
         NULL
     }
 },
@@ -409,6 +470,7 @@ panel_item[] = {
             (void*)&edit_msg,
             (void*)&scroll_group,
             (void*)&messages_group,
+            (void*)&button_group_audio,
             NULL
         }
     },
@@ -424,6 +486,7 @@ panel_item[] = {
     },
 },
 
+/* Side panel probably the chat window */
 panel_side = {
     .type = PANEL_NONE,
     .child = (PANEL*[]) {
@@ -431,11 +494,12 @@ panel_side = {
     }
 },
 
+/* Main window structure */
 panel_main = {
     .type = PANEL_MAIN,
     .child = (PANEL*[]) {
         (void*)&button_add, (void*)&button_groups, (void*)&button_transfer, (void*)&button_settings,
-        (void*)&button_name, (void*)&button_statusmsg, (void*)&button_status,
+        (void*)&button_avatar, (void*)&button_name, (void*)&button_statusmsg, (void*)&button_status,
         &panel_list, &panel_side,
         (void*)&scroll_list,
         (void*)&edit_search, (void*)&dropdown_filter,
@@ -470,7 +534,7 @@ void ui_scale(uint8_t scale)
     messages_group.panel.width = -SCROLL_WIDTH;
 
     scroll_settings.panel.y = LIST_Y;
-    scroll_settings.content_height = 400 * SCALE;
+    scroll_settings.content_height = 390 * SCALE;
 
     scroll_group.panel.y = LIST_Y;
     scroll_group.panel.height = MESSAGES_BOTTOM;
@@ -539,6 +603,14 @@ void ui_scale(uint8_t scale)
         .height = BM_LBUTTON_HEIGHT,
     },
 
+    b_group_audio = {
+        .type = PANEL_BUTTON,
+        .x = -31 * SCALE,
+        .y = 5 * SCALE,
+        .width = BM_LBUTTON_WIDTH,
+        .height = BM_LBUTTON_HEIGHT,
+    },
+
     b_video = {
         .type = PANEL_BUTTON,
         .x = -31 * SCALE,
@@ -579,6 +651,7 @@ void ui_scale(uint8_t scale)
         .height = BM_LBUTTON_HEIGHT,
     },
 
+/* top right chat message window button */
     b_chat1 = {
         .type = PANEL_BUTTON,
         .x = -5 * SCALE - BM_CB_WIDTH,
@@ -587,12 +660,21 @@ void ui_scale(uint8_t scale)
         .width = BM_CB_WIDTH,
     },
 
+/* bottom right chat message window button */
     b_chat2 = {
         .type = PANEL_BUTTON,
         .x = -5 * SCALE - BM_CB_WIDTH,
         .y = -47 * SCALE + BM_CB_HEIGHT + SCALE,
         .height = BM_CB_HEIGHT + SCALE,
         .width = BM_CB_WIDTH,
+    },
+
+    b_avatar = {
+        .type = PANEL_BUTTON,
+        .x = SELF_AVATAR_X,
+        .y = SELF_AVATAR_Y,
+        .width = BM_CONTACT_WIDTH,
+        .height = BM_CONTACT_WIDTH,
     },
 
     b_name = {
@@ -626,6 +708,7 @@ void ui_scale(uint8_t scale)
     button_copyid.panel = b_copyid;
     button_addfriend.panel = b_addfriend;
     button_call.panel = b_call;
+    button_group_audio.panel = b_group_audio;
     button_video.panel = b_video;
     button_sendfile.panel = b_sendfile;
     button_acceptfriend.panel = b_acceptfriend;
@@ -633,6 +716,7 @@ void ui_scale(uint8_t scale)
     button_videopreview.panel = b_videopreview;
     button_chat1.panel = b_chat1;
     button_chat2.panel = b_chat2;
+    button_avatar.panel = b_avatar;
     button_name.panel = b_name;
     button_statusmsg.panel = b_statusmsg;
     button_status.panel = b_status;
@@ -717,14 +801,40 @@ void ui_scale(uint8_t scale)
         .width = SCALE * 20
     },
 
-
     d_notifications = {
         .type = PANEL_DROPDOWN,
         .x = 5 * SCALE,
         .y = SCALE * 343,
         .height = SCALE * 12,
         .width = SCALE * 20
-    };
+    },
+
+    d_close_to_tray = {
+        .type = PANEL_DROPDOWN,
+        .x = 5 * SCALE,
+        .y = SCALE * 366,
+        .height = SCALE * 12,
+        .width = SCALE * 20
+    },
+
+    d_start_in_tray = {
+        .type = PANEL_DROPDOWN,
+        .x = 75 * SCALE,
+        .y = SCALE * 366,
+        .height = SCALE * 12,
+        .width = SCALE * 20
+    }
+
+#ifdef AUDIO_FILTERING
+    , d_audio_filtering = {
+        .type = PANEL_DROPDOWN,
+        .x = 190 * SCALE,
+        .y = SCALE * 132,
+        .height = SCALE * 12,
+        .width = SCALE * 20
+    }
+#endif
+    ;
 
     dropdown_audio_in.panel = d_audio_in;
     dropdown_audio_out.panel = d_audio_out;
@@ -737,7 +847,11 @@ void ui_scale(uint8_t scale)
     dropdown_udp.panel = d_udp;
     dropdown_logging.panel = d_logging;
     dropdown_audible_notification.panel = d_notifications;
-
+    dropdown_close_to_tray.panel = d_close_to_tray;
+    dropdown_start_in_tray.panel = d_start_in_tray;
+#ifdef AUDIO_FILTERING
+    dropdown_audio_filtering.panel = d_audio_filtering;
+#endif
 
 
     PANEL e_name = {
@@ -875,6 +989,14 @@ static void panel_update(PANEL *p, int x, int y, int width, int height)
 void ui_size(int width, int height)
 {
     panel_update(&panel_main, 0, 0, width, height);
+    tooltip_reset();
+}
+
+void ui_mouseleave(void)
+{
+    panel_mleave(&panel_main);
+    tooltip_reset();
+    redraw();
 }
 
 static void panel_draw_sub(PANEL *p, int x, int y, int width, int height)
@@ -937,6 +1059,7 @@ void panel_draw(PANEL *p, int x, int y, int width, int height)
 
     dropdown_drawactive();
     contextmenu_draw();
+    tooltip_draw();
 
     enddraw(x, y, width, height);
 }
@@ -968,6 +1091,10 @@ _Bool panel_mmove(PANEL *p, int x, int y, int width, int height, int mx, int my,
     }
 
     _Bool draw = p->type ? mmovefunc[p->type - 1](p, x, y, width, height, mx, mmy, dx, dy) : 0;
+    // Has to be called before children mmove
+    if(p == &panel_main) {
+        draw |= tooltip_mmove();
+    }
     PANEL **pp = p->child, *subp;
     if(pp) {
         while((subp = *pp++)) {
@@ -1009,7 +1136,7 @@ static _Bool panel_mdown_sub(PANEL *p)
 
 void panel_mdown(PANEL *p)
 {
-    if(contextmenu_mdown()) {
+    if(contextmenu_mdown() || tooltip_mdown()) {
         redraw();
         return;
     }
@@ -1114,6 +1241,7 @@ _Bool panel_mup(PANEL *p)
 
     if(p == &panel_main) {
         draw |= contextmenu_mup();
+        tooltip_mup();
         if(draw) {
             redraw();
         }

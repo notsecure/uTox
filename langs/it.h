@@ -106,6 +106,9 @@ msgstr("Dispositivi")
 msgid(AUDIOINPUTDEVICE)
 msgstr("Audio (input)")
 
+msgid(AUDIOFILTERING)
+msgstr("Filtro Audio")
+
 msgid(AUDIOOUTPUTDEVICE)
 msgstr("Audio (output)")
 
@@ -220,3 +223,17 @@ msgstr("Porta")
 msgid(WINDOW_TITLE_VIDEO_PREVIEW)
 msgstr("uTox video test")
 
+msgid(MUTE)
+msgstr("Disattiva")
+
+msgid(UNMUTE)
+msgstr("Attiva")
+
+msgid(CLEAR_HISTORY)
+msgstr("Cancella cronologia")
+
+msgid(AVATAR_TOO_LARGE_MAX_SIZE_IS)
+msgstr("Avatar troppo grande. Dimensione massima: ")
+
+msgid(CANT_FIND_FILE_OR_EMPTY)
+msgstr("Impossibile trovare il file o il file è vuoto.")

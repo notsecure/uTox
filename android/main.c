@@ -60,6 +60,22 @@ void postmessage(uint32_t msg, uint16_t param1, uint16_t param2, void *data)
     write(pipefd[1], &piping, sizeof(PIPING));
 }
 
+void image_set_filter(UTOX_NATIVE_IMAGE *image, uint8_t filter)
+{
+}
+
+void image_set_scale(UTOX_NATIVE_IMAGE *image, double scale)
+{
+}
+
+void draw_image(const UTOX_NATIVE_IMAGE *image, int x, int y, uint32_t width, uint32_t height, uint32_t imgx, uint32_t imgy)
+{
+}
+
+
+/* this function is no longer used, but it might contain handy information for creating the newer image draw functions
+   on android. Currently drawing images is unsupported.
+
 void drawimage(UTOX_NATIVE_IMAGE data, int x, int y, int width, int height, int maxwidth, _Bool zoom, double position)
 {
     GLuint texture = data;
@@ -81,6 +97,7 @@ void drawimage(UTOX_NATIVE_IMAGE data, int x, int y, int width, int height, int 
 
     glUniform3fv(k2, 1, one);
 }
+*/
 
 void thread(void func(void*), void *args)
 {
@@ -121,6 +138,10 @@ void openfilesend(void)
 {
 }
 
+void openfileavatar(void)
+{
+}
+
 void savefilerecv(uint32_t fid, MSG_FILE *file)
 {
 }
@@ -133,7 +154,7 @@ void setselection(char_t *data, STRING_IDX length)
 {
 }
 
-UTOX_NATIVE_IMAGE png_to_image(UTOX_PNG_IMAGE data, size_t size, uint16_t *w, uint16_t *h)
+UTOX_NATIVE_IMAGE png_to_image(const UTOX_PNG_IMAGE data, size_t size, uint16_t *w, uint16_t *h)
 {
     uint8_t *out;
     unsigned width, height;
@@ -183,11 +204,22 @@ int datapath(uint8_t *dest)
     return 0;
 }
 
+int datapath_subdir(uint8_t *dest, const char *subdir)
+{
+    return 0;
+}
+
 void flush_file(FILE *file)
 {
     fflush(file);
     int fd = fileno(file);
     fsync(fd);
+}
+
+
+
+int ch_mod(uint8_t *file){
+    /* You're probably looking for ./xlib as android isn't working when this was written. */
 }
 
 void setscale(void)
@@ -200,7 +232,7 @@ void setscale(void)
     }
 }
 
-void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length)
+void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length, uint8_t *cid)
 {
 }
 
@@ -442,6 +474,18 @@ static uint32_t getkeychar(int32_t key) /* get a character from an android keyco
 void redraw(void)
 {
     _redraw = 1;
+}
+void force_redraw(void)
+{
+    redraw();
+}
+
+void update_tray(void)
+{
+}
+
+void config_osdefaults(UTOX_SAVE *r)
+{
 }
 
 static void android_main(void) /* main thread */

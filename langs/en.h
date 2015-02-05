@@ -112,6 +112,9 @@ msgstr("Device Selection")
 msgid(AUDIOINPUTDEVICE)
 msgstr("Audio Input Device")
 
+msgid(AUDIOFILTERING)
+msgstr("Filter Audio")
+
 msgid(AUDIOOUTPUTDEVICE)
 msgstr("Audio Output Device")
 
@@ -153,6 +156,12 @@ msgstr("Enable Audible Notification (Ringtone)")
 
 msgid(IS_TYPING)
 msgstr("is typing...")
+
+msgid(CLOSE_TO_TRAY)
+msgstr("Close To Tray")
+
+msgid(START_IN_TRAY)
+msgstr("Start In Tray")
 
 msgid(COPY)
 msgstr("Copy")
@@ -253,3 +262,17 @@ msgstr("Port")
 msgid(WINDOW_TITLE_VIDEO_PREVIEW)
 msgstr("Video Preview")
 
+msgid(MUTE)
+msgstr("Mute")
+
+msgid(UNMUTE)
+msgstr("Unmute")
+
+msgid(AVATAR_TOO_LARGE_MAX_SIZE_IS)
+msgstr("Avatar too large. Maximum size: ")
+
+msgid(CANT_FIND_FILE_OR_EMPTY)
+msgstr("Cannot find selected file or selected file is empty.")
+
+msgid(CLEAR_HISTORY)
+msgstr("Clear history")

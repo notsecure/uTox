@@ -57,19 +57,23 @@ static void callback_friend_request(Tox *UNUSED(tox), const uint8_t *id, const u
 
 static void callback_friend_message(Tox *tox, int fid, const uint8_t *message, uint16_t length, void *UNUSED(userdata))
 {
+    /* send message to UI */
     postmessage(FRIEND_MESSAGE, fid, 0, copy_message(message, length, MSG_TYPE_TEXT));
 
     debug("Friend Message (%u): %.*s\n", fid, length, message);
 
+    /* write message to logfile */
     log_write(tox, fid, message, length, 0, LOG_FILE_MSG_TYPE_TEXT);
 }
 
 static void callback_friend_action(Tox *tox, int fid, const uint8_t *action, uint16_t length, void *UNUSED(userdata))
 {
+    /* send action/emote to UI */
     postmessage(FRIEND_MESSAGE, fid, 0, copy_message(action, length, MSG_TYPE_ACTION_TEXT));
 
     debug("Friend Action (%u): %.*s\n", fid, length, action);
 
+    /* write action/emote to logfile */
     log_write(tox, fid, action, length, 0, LOG_FILE_MSG_TYPE_ACTION);
 }
 
@@ -146,19 +150,60 @@ static void callback_connection_status(Tox *tox, int fid, uint8_t status, void *
                 tox_file_send_control(tox, fid, 1, i, TOX_FILECONTROL_RESUME_BROKEN, (void*)&f->incoming[i].bytes, sizeof(uint64_t));
             }
         }
+        /* request avatar info (in case it changed) */
+        tox_request_avatar_info(tox, fid);
     }
 
     debug("Friend Online/Offline (%u): %u\n", fid, status);
 }
 
-static void callback_group_invite(Tox *tox, int fid, const uint8_t *data, uint16_t length, void *UNUSED(userdata))
+void callback_avatar_info(Tox *tox, int fid, uint8_t format, uint8_t *hash, void *UNUSED(userdata))
 {
-    int gid = tox_join_groupchat(tox, fid, data, length);
-    if(gid != -1) {
-        postmessage(GROUP_ADD, gid, 0, NULL);
+    FRIEND *f = &friend[fid];
+
+    if (format != TOX_AVATAR_FORMAT_NONE) {
+        if (!friend_has_avatar(f) || memcmp(f->avatar.hash, hash, TOX_HASH_LENGTH) != 0) { // check if avatar has changed
+            memcpy(f->avatar.hash, hash, TOX_HASH_LENGTH); // set hash pre-emptively so we don't request data twice
+
+            char_t hash_string[TOX_HASH_LENGTH * 2];
+            hash_to_string(hash_string, hash);
+            debug("Friend Avatar Hash (%u): %.*s\n", fid, (int)sizeof(hash_string), hash_string);
+
+            tox_request_avatar_data(tox, fid);
+        }
+    } else if (friend_has_avatar(f)) {
+        postmessage(FRIEND_UNSETAVATAR, fid, 0, NULL); // unset avatar if we had one
+    }
+}
+
+void callback_avatar_data(Tox *tox, int fid, uint8_t format, uint8_t *hash, uint8_t *data, uint32_t datalen, void *UNUSED(userdata))
+{
+    FRIEND *f = &friend[fid];
+
+    if (memcmp(f->avatar.hash, hash, TOX_HASH_LENGTH) == 0) { // same hash as in last avatar_info
+        uint8_t *data_out = malloc(datalen);
+        memcpy(data_out, data, datalen);
+        postmessage(FRIEND_SETAVATAR, fid, datalen, data_out);
+    }
+}
+
+void callback_av_group_audio(Tox *tox, int groupnumber, int peernumber, const int16_t *pcm, unsigned int samples,
+                                    uint8_t channels, unsigned int sample_rate, void *userdata);
+
+static void callback_group_invite(Tox *tox, int fid, uint8_t type, const uint8_t *data, uint16_t length, void *UNUSED(userdata))
+{
+    int gid = -1;
+    if (type == TOX_GROUPCHAT_TYPE_TEXT) {
+        gid = tox_join_groupchat(tox, fid, data, length);
+    } else if (type == TOX_GROUPCHAT_TYPE_AV) {
+        gid = toxav_join_av_groupchat(tox, fid, data, length, &callback_av_group_audio, NULL);
     }
 
-    debug("Group Invite (%i,f:%i)\n", gid, fid);
+    if(gid != -1) {
+        postmessage(GROUP_ADD, gid, 0, tox);
+    }
+
+    debug("Group Invite (%i,f:%i) type %u\n", gid, fid, type);
 }
 
 static void callback_group_message(Tox *tox, int gid, int pid, const uint8_t *message, uint16_t length, void *UNUSED(userdata))
@@ -179,12 +224,12 @@ static void callback_group_namelist_change(Tox *tox, int gid, int pid, uint8_t c
 {
     switch(change) {
     case TOX_CHAT_CHANGE_PEER_ADD: {
-        postmessage(GROUP_PEER_ADD, gid, pid, NULL);
+        postmessage(GROUP_PEER_ADD, gid, pid, tox);
         break;
     }
 
     case TOX_CHAT_CHANGE_PEER_DEL: {
-        postmessage(GROUP_PEER_DEL, gid, pid, NULL);
+        postmessage(GROUP_PEER_DEL, gid, pid, tox);
         break;
     }
 
@@ -203,4 +248,20 @@ static void callback_group_namelist_change(Tox *tox, int gid, int pid, uint8_t c
     }
     }
     debug("Group Namelist Change (%u, %u): %u\n", gid, pid, change);
+}
+
+static void callback_group_title(Tox *tox, int gid, int pid, const uint8_t *title, uint8_t length, void *UNUSED(userdata))
+{
+    length = utf8_validate(title, length);
+    if (!length)
+        return;
+
+    uint8_t *copy_title = malloc(length);
+    if (!copy_title)
+        return;
+
+    memcpy(copy_title, title, length);
+    postmessage(GROUP_TITLE, gid, length, copy_title);
+
+    debug("Group Title (%u, %u): %.*s\n", gid, pid, length, title);
 }

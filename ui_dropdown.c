@@ -53,8 +53,8 @@ static void dropdown_filter_onselect(uint16_t i, const DROPDOWN* UNUSED(dm))
 
 static void dropdown_proxy_onselect(uint16_t i, const DROPDOWN* UNUSED(dm))
 {
-    if((i != 0) != (options.proxy_enabled) || i) {
-        options.proxy_enabled = (i != 0);
+    if((i != 0) != (options.proxy_type) || i) {
+        options.proxy_type = (i != 0);
         if(i == 2 && !options.udp_disabled) {
             options.udp_disabled = 1;
             dropdown_udp.selected = dropdown_udp.over = 1;
@@ -98,8 +98,20 @@ static void dropdown_notifications_onselect(uint16_t i, const DROPDOWN* UNUSED(d
     audible_notifications_enabled = !i;
 }
 
+static void dropdown_audio_filtering_onselect(uint16_t i, const DROPDOWN* UNUSED(dm))
+{
+    audio_filtering_enabled = !i;
+}
 
+static void dropdown_close_to_tray_onselect(uint16_t i, const DROPDOWN* UNUSED(dm)){
+    close_to_tray = i;
+    debug("Close To Tray.   :: %i\n", close_to_tray);
+}
 
+static void dropdown_start_in_tray_onselect(uint16_t i, const DROPDOWN* UNUSED(dm)){
+    start_in_tray = i;
+    debug("Start in Tray.   :: %i\n", start_in_tray);
+}
 
 static UI_STRING_ID dpidrops[] = {
     STR_DPI_TINY,
@@ -189,9 +201,30 @@ dropdown_logging = {
     .userdata = noyesdrops
 },
 
+dropdown_close_to_tray = {
+    .ondisplay = simple_dropdown_ondisplay,
+    .onselect = dropdown_close_to_tray_onselect,
+    .dropcount = countof(noyesdrops),
+    .userdata = noyesdrops
+},
+
+dropdown_start_in_tray = {
+    .ondisplay = simple_dropdown_ondisplay,
+    .onselect = dropdown_start_in_tray_onselect,
+    .dropcount = countof(noyesdrops),
+    .userdata = noyesdrops
+},
+
 dropdown_audible_notification = {
     .ondisplay = simple_dropdown_ondisplay,
     .onselect = dropdown_notifications_onselect,
+    .dropcount = countof(yesnodrops),
+    .userdata = yesnodrops
+},
+
+dropdown_audio_filtering = {
+    .ondisplay = simple_dropdown_ondisplay,
+    .onselect = dropdown_audio_filtering_onselect,
     .dropcount = countof(yesnodrops),
     .userdata = yesnodrops
 };

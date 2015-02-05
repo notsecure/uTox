@@ -1,3 +1,13 @@
+
+/* draws an image in the style of an avatar at within rect (x,y,targetwidth,targetheight)
+ * this means: resize the image while keeping proportion so that the dimension(width or height) that has the smallest rational difference to the targetdimension becomes exactly targetdimension, then
+ * crop the image so it fits in the (x,y,targetwidth,targetheight) rect, and
+ * set the position if a dimension is too large so it's centered on the middle
+ *
+ * first argument is the image to draw, width and height are the width and height of the input image
+ */
+void draw_avatar_image(UTOX_NATIVE_IMAGE *image, int x, int y, uint32_t width, uint32_t height, uint32_t targetwidth, uint32_t targetheight);
+
 enum
 {
     PANEL_NONE,
@@ -68,6 +78,8 @@ extern UI_LANG_ID LANG;
 
 void ui_scale(uint8_t scale);
 void ui_size(int width, int height);
+
+void ui_mouseleave(void);
 
 void panel_draw(PANEL *p, int x, int y, int width, int height);
 
@@ -166,6 +178,7 @@ uint8_t SCALE;
 #define C_YELLOW_LIGHT          RGB(227, 210, 76)
 #define C_RED                   RGB(200, 78, 78)
 #define C_RED_LIGHT             RGB(220, 86, 86)
+#define C_BLUE                  RGB(78, 78, 200)
 
 #define LIST_MAIN               GRAY(65)
 #define LIST_HIGHLIGHT          GRAY(80)

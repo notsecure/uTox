@@ -40,6 +40,9 @@ struct messages {
     // if present. urlover == STRING_IDX_MAX if there's none.
     STRING_IDX urlover, urllen;
 
+    // Was the url pressed by the mouse.
+    _Bool urlmdown;
+
     uint32_t height, width;
 
     // Indices of messages, that the mouse is over now/has been
@@ -83,7 +86,7 @@ typedef struct {
     uint16_t w, h;
     _Bool zoom;
     double position;
-    UTOX_NATIVE_IMAGE image;
+    UTOX_NATIVE_IMAGE *image;
 } MSG_IMG;
 
 typedef struct msg_file {
@@ -118,6 +121,7 @@ _Bool messages_char(uint32_t ch);
 void messages_updateheight(MESSAGES *m);
 void message_updateheight(MESSAGES *m, MESSAGE *msg, MSG_DATA *p);
 void message_add(MESSAGES *m, MESSAGE *msg, MSG_DATA *p);
+void message_clear(MESSAGES *m, MSG_DATA *p);
 void messages_set_typing(MESSAGES *m, MSG_DATA *p, int typing);
 
 void message_free(MESSAGE *msg);
