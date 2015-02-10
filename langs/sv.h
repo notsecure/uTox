@@ -274,10 +274,6 @@ msgid(UNMUTE)
 msgstr("Avtysta")
 
 //TODO: Localize or remove.
-//msgid(AUDIONOTIFICATIONS)
-//msgstr("Enable Audible Notification (Ringtone)")
-
-//TODO: Localize or remove.
 //msgid(CLOSE_TO_TRAY)
 //msgstr("Close To Tray")
 
@@ -295,7 +291,3 @@ msgstr("Avtysta")
 
 //msgid(CLEAR_HISTORY)
 //msgstr("Clear history")
-
-//TODO: Localize or remove.
-//msgid(AUDIOFILTERING)
-//msgstr("Filter Audio")
