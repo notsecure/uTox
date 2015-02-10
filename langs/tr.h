@@ -280,3 +280,34 @@ msgstr("İptal Edildi")
 //TODO: Localize or remove.
 //msgid(AUDIONOTIFICATIONS)
 //msgstr("Enable Audible Notification (Ringtone)")
+
+//TODO: Localize or remove.
+//msgid(CLOSE_TO_TRAY)
+//msgstr("Close To Tray")
+
+//TODO: Localize or remove.
+//msgid(START_IN_TRAY)
+//msgstr("Start In Tray")
+
+//TODO: Localize or remove.
+//msgid(MUTE)
+//msgstr("Mute")
+
+//TODO: Localize or remove.
+//msgid(UNMUTE)
+//msgstr("Unmute")
+
+//TODO: Localize or remove.
+//msgid(AVATAR_TOO_LARGE_MAX_SIZE_IS)
+//msgstr("Avatar too large. Maximum size: ")
+
+//TODO: Localize or remove.
+//msgid(CANT_FIND_FILE_OR_EMPTY)
+//msgstr("Cannot find selected file or selected file is empty.")
+
+//msgid(CLEAR_HISTORY)
+//msgstr("Clear history")
+
+//TODO: Localize or remove.
+//msgid(AUDIOFILTERING)
+//msgstr("Filter Audio")
