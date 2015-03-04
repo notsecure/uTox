@@ -71,7 +71,7 @@ void theme_load(char loadtheme)
         COLOR_MAIN_BACKGROUND                   = UTOX_RGB(51, 51, 51);
         COLOR_MAIN_TEXT                         = UTOX_RGB(223, 223, 223);
         COLOR_MAIN_SUBTEXT                      = UTOX_RGB(187, 187, 187);
-        COLOR_MAIN_ACTIONTEXT                   = UTOX_RGB(188, 169, 39);
+        COLOR_MAIN_ACTIONTEXT                   = UTOX_RGB(163, 20, 20);
         COLOR_MAIN_URLTEXT                      = COLOR_MAIN_ACTIONTEXT;
         COLOR_MAIN_QUOTETEXT                    = UTOX_RGB(85, 179, 23);
         COLOR_LIST_BACKGROUND                   = UTOX_RGB(34, 34, 34);
@@ -83,9 +83,9 @@ void theme_load(char loadtheme)
         COLOR_SELECTION_TEXT                    = COLOR_MAIN_BACKGROUND;
         COLOR_GROUP_UNUSUAL                     = COLOR_MAIN_URLTEXT;
         COLOR_EDGE_NORMAL                       = UTOX_RGB(85, 85, 85);
-        COLOR_EDGE_ACTIVE                       = UTOX_RGB(136, 136, 34);
+        COLOR_EDGE_ACTIVE                       = UTOX_RGB(163, 20, 20);
         COLOR_EDGE_HOVER                        = UTOX_RGB(153, 153, 153);
-        COLOR_ACTIVEOPTION_BACKGROUND           = UTOX_RGB(136, 136, 34);
+        COLOR_ACTIVEOPTION_BACKGROUND           = UTOX_RGB(163, 20, 20);
         COLOR_ACTIVEOPTION_TEXT                 = COLOR_MAIN_TEXT;
         COLOR_MENU_ACTIVE_TEXT                  = UTOX_RGB(21, 21, 21);
         COLOR_BUTTON_SUCCESS_BACKGROUND         = UTOX_RGB(65, 65, 65);
