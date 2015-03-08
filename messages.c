@@ -72,7 +72,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
         if(y >= height + 50 * SCALE) {
             break;
         }
-    
+
         // Draw timestamps
         {
             char timestr[6];
@@ -91,11 +91,11 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, &msg->msg[msg->length] + 1, msg->msg[msg->length]);
         } else {
             FRIEND *f = &friend[m->data->id];
-            
+
             // Always draw name next to action message
             if(msg->msg_type == MSG_TYPE_ACTION_TEXT)
                 lastauthor = 0xFF;
-                
+
             if(msg->author != lastauthor) {
                 // Draw author name
                 // If author is current user
@@ -142,11 +142,11 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             } else {
                 setcolor(COLOR_MAIN_CHATTEXT);
             }
-            
+
             if (msg->msg_type == MSG_TYPE_ACTION_TEXT) {
                 setcolor(COLOR_MAIN_ACTIONTEXT);
             }
-            
+
             setfont(FONT_TEXT);
             int ny = drawtextmultiline(x + MESSAGES_X, x + width - TIME_WIDTH, y, y, y + msg->height, font_small_lineheight, msg->msg, msg->length, h1, h2 - h1, 1);
             if(ny < y || (uint32_t)(ny - y) + MESSAGES_SPACING != msg->height) {
@@ -191,7 +191,8 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             } else if(file->status == FILE_KILLED) {
                 setcolor(COLOR_BUTTON_DANGER_TEXT);
                 drawalpha(BM_FT, xx, y, BM_FT_WIDTH, BM_FT_HEIGHT, COLOR_BUTTON_DANGER_BACKGROUND);
-                drawalpha(BM_NO, xx + BM_FTM_WIDTH + SCALE + (BM_FTB_WIDTH - BM_FB_WIDTH) / 2, y + SCALE * 4, BM_FB_WIDTH, BM_FB_HEIGHT, COLOR_BUTTON_DANGER_TEXT);
+                // Canceled file transfers have no action TODO re-add this X and have it delete this message...
+                // drawalpha(BM_NO, xx + BM_FTM_WIDTH + SCALE + (BM_FTB_WIDTH - BM_FB_WIDTH) / 2, y + SCALE * 4, BM_FB_WIDTH, BM_FB_HEIGHT, COLOR_BUTTON_DANGER_TEXT);
                 drawstr(xx + 5 * SCALE, y + 17 * SCALE, CANCELLED);
             } else {
                 if(file->status == FILE_BROKEN) {
