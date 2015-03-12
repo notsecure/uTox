@@ -72,7 +72,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
         if(y >= height + 50 * SCALE) {
             break;
         }
-    
+
         // Draw timestamps
         {
             char timestr[6];
@@ -91,26 +91,27 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, &msg->msg[msg->length] + 1, msg->msg[msg->length]);
         } else {
             FRIEND *f = &friend[m->data->id];
-            
+
             // Always draw name next to action message
             if(msg->msg_type == MSG_TYPE_ACTION_TEXT)
                 lastauthor = 0xFF;
-                
+
             if(msg->author != lastauthor) {
                 // Draw author name
                 // If author is current user
                 setfont(FONT_TEXT);
-                if(msg->msg_type == MSG_TYPE_ACTION_TEXT)
+                if(msg->msg_type == MSG_TYPE_ACTION_TEXT){
                     setcolor(COLOR_MAIN_ACTIONTEXT);
-                else
-                    if(msg->author)
+                    drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, " * ", 3);
+                } else {
+                    if(msg->author){
                         setcolor(COLOR_MAIN_SUBTEXT);
-                    else
+                        drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, self.name, self.name_length);
+                    } else {
                         setcolor(COLOR_MAIN_CHATTEXT);
-                if(msg->author)
-                    drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, self.name, self.name_length);
-                else
-                    drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, f->name, f->name_length);
+                        drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, f->name, f->name_length);
+                    }
+                }
                 lastauthor = msg->author;
             }
         }
@@ -119,6 +120,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
         switch(msg->msg_type) {
         case MSG_TYPE_TEXT:
         case MSG_TYPE_ACTION_TEXT: {
+            FRIEND *f = &friend[m->data->id];
             // Normal message
             STRING_IDX h1 = STRING_IDX_MAX, h2 = STRING_IDX_MAX;
             if(i == m->data->istart) {
@@ -142,13 +144,34 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             } else {
                 setcolor(COLOR_MAIN_CHATTEXT);
             }
-            
+
+            setfont(FONT_TEXT);
+            char_t *action_message, *msg_text;
+            STRING_IDX action_length;
             if (msg->msg_type == MSG_TYPE_ACTION_TEXT) {
                 setcolor(COLOR_MAIN_ACTIONTEXT);
+                if(msg->author){
+                    action_message = malloc(sizeof(self.name) * (self.name_length + 2));
+                    action_length = self.name_length;
+                    memcpy(action_message, self.name, self.name_length);
+                } else {
+                    action_message = malloc(sizeof(f->name) * (f->name_length + 2));
+                    action_length = f->name_length;
+                    memcpy(action_message, f->name, f->name_length);
+                }
+                msg_text = malloc(sizeof(msg->msg) * (msg->length + action_length + 1));
+                memcpy(msg_text, action_message, action_length);
+                msg_text += action_length;
+                memcpy(msg_text, " ", 1); msg_text++;
+                memcpy(msg_text, msg->msg, msg->length);
+                msg_text -= (action_length + 1);
+            } else {
+                action_length = 0;
+                msg_text = malloc(msg->length);
+                memcpy(msg_text, msg->msg, msg->length);
             }
-            
-            setfont(FONT_TEXT);
-            int ny = drawtextmultiline(x + MESSAGES_X, x + width - TIME_WIDTH, y, y, y + msg->height, font_small_lineheight, msg->msg, msg->length, h1, h2 - h1, 1);
+            int ny = drawtextmultiline(x + MESSAGES_X, x + width - TIME_WIDTH, y, y, y + msg->height, font_small_lineheight, msg_text, (msg->length + action_length), h1, h2 - h1, 1);
+
             if(ny < y || (uint32_t)(ny - y) + MESSAGES_SPACING != msg->height) {
                 debug("error101 %u %u\n", ny -y, msg->height - MESSAGES_SPACING);
             }
