@@ -151,26 +151,30 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
             if (msg->msg_type == MSG_TYPE_ACTION_TEXT) {
                 setcolor(COLOR_MAIN_ACTIONTEXT);
                 if(msg->author){
-                    action_message = malloc(sizeof(self.name) * (self.name_length + 2));
+                    action_message = malloc(self.name_length + 2);
                     action_length = self.name_length;
                     memcpy(action_message, self.name, self.name_length);
                 } else {
-                    action_message = malloc(sizeof(f->name) * (f->name_length + 2));
+                    action_message = malloc(f->name_length + 2);
                     action_length = f->name_length;
                     memcpy(action_message, f->name, f->name_length);
                 }
-                msg_text = malloc(sizeof(msg->msg) * (msg->length + action_length + 1));
+                msg_text = malloc((msg->length + action_length + 1));
                 memcpy(msg_text, action_message, action_length);
                 msg_text += action_length;
                 memcpy(msg_text, " ", 1); msg_text++;
+                action_length++;
                 memcpy(msg_text, msg->msg, msg->length);
-                msg_text -= (action_length + 1);
+                msg_text -= (action_length);
+                free(action_message);
             } else {
                 action_length = 0;
                 msg_text = malloc(msg->length);
                 memcpy(msg_text, msg->msg, msg->length);
             }
             int ny = drawtextmultiline(x + MESSAGES_X, x + width - TIME_WIDTH, y, y, y + msg->height, font_small_lineheight, msg_text, (msg->length + action_length), h1, h2 - h1, 1);
+
+            free(msg_text);
 
             if(ny < y || (uint32_t)(ny - y) + MESSAGES_SPACING != msg->height) {
                 debug("error101 %u %u\n", ny -y, msg->height - MESSAGES_SPACING);
