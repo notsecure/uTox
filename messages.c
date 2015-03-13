@@ -84,11 +84,19 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
         }
 
         // Draw the names for groups or friends
+        _Bool group_text  = 0;
         if(m->type) {
-            // Group message authors are all the same colour
-            setcolor(COLOR_MAIN_CHATTEXT);
-            setfont(FONT_TEXT);
-            drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, &msg->msg[msg->length] + 1, msg->msg[msg->length]);
+            if(msg->msg_type == MSG_TYPE_ACTION_TEXT){
+                setcolor(COLOR_MAIN_ACTIONTEXT);
+                drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, " * ", 3);
+                group_text = 1;
+            } else {
+                setcolor(COLOR_MAIN_CHATTEXT);
+                setfont(FONT_TEXT);
+                drawtextwidth_right(x, MESSAGES_X - NAME_OFFSET, y, &msg->msg[msg->length] + 1, msg->msg[msg->length]);
+            }
+
+            // Group message authors are all the same color
         } else {
             FRIEND *f = &friend[m->data->id];
 
@@ -154,6 +162,10 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
                     action_message = malloc(self.name_length + 2);
                     action_length = self.name_length;
                     memcpy(action_message, self.name, self.name_length);
+                } else if(group_text){
+                    action_message = malloc(msg->msg[msg->length] + 2);
+                    action_length = msg->msg[msg->length];
+                    memcpy(action_message, &msg->msg[msg->length] + 1 , msg->msg[msg->length]);
                 } else {
                     action_message = malloc(f->name_length + 2);
                     action_length = f->name_length;
