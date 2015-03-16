@@ -324,20 +324,67 @@ static void incoming_file_callback_control(Tox *tox, uint32_t friend_number, uin
     }
 }
 
-static void incoming_file_callback_chunk(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position,
+static void incoming_file_callback_chunk(Tox *tox, uint32_t friend_id, uint32_t file_number, uint64_t position,
                                                                 const uint8_t *data, size_t length, void *user_data){
     //new chunk for existing file
 }
 
-void outgoing_file_send_new(Tox *tox, uint32_t friend_number, uint8_t *path, const uint8_t *filename, size_t filename_length){
+void outgoing_file_send_new(Tox *tox, uint32_t friend_id, uint8_t *path, const uint8_t *filename, size_t filename_length){
 
-    debug("sending new outgoing file to friend %u, filename, %s", friend_number, filename);
+    debug("FileTransfer:\tStarting outgoing file to friend %u. (filename, %s)\n", friend_id, filename);
+
+    if (friend[friend_id].count_outgoing >= MAX_FILE_TRANSFERS || (file_tend - file_t) >= countof(file_t)) {
+        debug("FileTransfer:\tMaximum outgoing file sending limit reached(%u/%u) for friend(%u). ABORTING!\n",
+                                                    friend[friend_id].count_outgoing, MAX_FILE_TRANSFERS, friend_id);
+        return;
+    }
+
+    FILE *file = fopen((char*)path, "rb");
+    if(!file) {
+        debug("FileTransfer:\tUnable to open file for reading!\n");
+        return;
+    }
 
 
-    uint64_t file_size = 0;
     TOX_ERR_FILE_SEND *error;
+    uint64_t file_size = 0;
+    fseeko(file, 0, SEEK_END);
+    file_size = ftello(file);
+    fseeko(file, 0, SEEK_SET);
 
-    tox_file_send(tox, friend_number, TOX_FILE_KIND_DATA, file_size, filename, filename_length, error);
+    int filenumber = tox_file_send(tox, friend_id, TOX_FILE_KIND_DATA, file_size, filename, filename_length, &error);
+
+    if(filenumber != -1) {
+        FILE_T *active_transfer = &friend[friend_id].outgoing[filenumber];
+        memset(active_transfer, 0, sizeof(FILE_T));
+
+        *file_tend++ = active_transfer;
+
+        active_transfer->fid = friend_id;
+        active_transfer->filenumber = filenumber;
+        active_transfer->status = FT_PENDING;
+        //TODO active_transfer->sendsize = tox_file_data_size(tox, fid);
+
+        // name_lenght max size is FILE_T->name.
+        filename_length = filename_length > sizeof(active_transfer->name) ? sizeof(active_transfer->name) : filename_length;
+        active_transfer->name_length = filename_length;
+        memcpy(active_transfer->name, filename, filename_length);
+
+        active_transfer->total = file_size;
+        active_transfer->path = (uint8_t*)strdup((char*)path);
+
+        active_transfer->data = file;
+
+        // TODO We don't need to fill the buffer, until we get the call back.
+        active_transfer->buffer = malloc(active_transfer->sendsize);
+        // fillbuffer(active_transfer);
+
+        postmessage(FRIEND_FILE_OUT_NEW, friend_id, filenumber, NULL);
+        ++friend[friend_id].count_outgoing;
+        debug("Sending file %d of %d(max) to friend(%d).\n", friend[friend_id].count_outgoing, MAX_FILE_TRANSFERS, friend_id);
+    } else {
+        debug("tox_file_send() failed\n");
+    }
 }
 
 static void outgoing_file_callback_chunk(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position,
