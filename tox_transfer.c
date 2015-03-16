@@ -328,9 +328,27 @@ static void incoming_file_callback_control(Tox *tox, uint32_t friend_number, uin
     }
 }
 
-static void incoming_file_callback_chunk(Tox *tox, uint32_t friend_id, uint32_t file_number, uint64_t position,
+static void incoming_file_callback_chunk(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position,
                                                                 const uint8_t *data, size_t length, void *user_data){
-    //new chunk for existing file
+    debug("FileTransfer:\tIncoming chunk for friend_id (%u), and file_id (%u). Start (%u), End (%u).\r",
+                                                                      friend_number, file_number, position, length);
+    FILE_T *file_handle = &friend[friend_number].incoming[file_number];
+    FILE *file = file_handle->data;
+    uint64_t last_bit = position + length;
+
+    fseeko(file, 0, position);
+    size_t write_size = fwrite(data, 1, length, file);
+
+    if(write_size != length){
+        debug("\n\nFileTransfer:\tERROR WRITING DATA TO FILE! (%u & %u)\n\n", friend_number, file_number);
+        tox_postmessage(TOX_FILE_INCOMING_CANCEL, friend_number, file_number, NULL);
+        return;
+    }
+
+    TOX_ERR_FILE_SEND_CHUNK error;
+    if(last_bit == file_handle->total){
+        debug("\nFileTransfer:\tIncoming transfer is done (%u & %u)\n", friend_number, file_number);
+    }
 }
 
 void outgoing_file_send_new(Tox *tox, uint32_t friend_id, uint8_t *path, const uint8_t *filename, size_t filename_length){
@@ -401,7 +419,9 @@ static void outgoing_file_callback_chunk(Tox *tox, uint32_t friend_number, uint3
     uint8_t *buffer;
     buffer = malloc(length);
 
-    FILE *file = friend[friend_number].outgoing[file_number].data;
+    FILE_T *file_handle = &friend[friend_number].outgoing[file_number];
+    FILE *file = file_handle->data;
+    uint64_t last_bit = position + length;
 
     fseeko(file, 0, position);
     size_t read_size = fread(buffer, 1, length, file);
@@ -415,6 +435,9 @@ static void outgoing_file_callback_chunk(Tox *tox, uint32_t friend_number, uint3
 
     TOX_ERR_FILE_SEND_CHUNK error;
     tox_file_send_chunk(tox, friend_number, file_number, position, data, length, &error);
+    if(last_bit == file_handle->total){
+        debug("FileTransfer:\tOutgoing transfer is done (%u & %u)\n", friend_number, file_number);
+    }
 }
 
 
