@@ -1104,7 +1104,9 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         /* param1: friend #
          * param2: file #
          */
-        //TODO tox_file_send_control(tox, param1, 1, param2, TOX_FILECONTROL_ACCEPT, NULL, 0);
+        TOX_ERR_FILE_CONTROL *error;
+                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
+        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME, &error);
         postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_OK);
         break;
     }
@@ -1112,7 +1114,9 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         /* param1: friend #
          * param2: file #
          */
-        //TODO tox_file_send_control(tox, param1, 1, param2, TOX_FILECONTROL_PAUSE, NULL, 0);
+        TOX_ERR_FILE_CONTROL *error;
+                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
+        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_PAUSE, &error);
         postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_PAUSED);
         break;
     }
@@ -1131,7 +1135,9 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         }
 
         ft->status = FT_NONE;
-        //TODO tox_file_send_control(tox, param1, 1, param2, TOX_FILECONTROL_KILL, NULL, 0);
+        TOX_ERR_FILE_CONTROL *error;
+                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
+        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_CANCEL, &error);
         postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_KILLED);
         break;
     }
