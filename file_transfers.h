@@ -9,14 +9,14 @@ enum { // TODO replace these
 };
 
 enum UTOX_FILE_TRANSFER_STATUS{
-    FILE_TRANS_STATUS_NONE,
-    FILE_TRANS_STATUS_ACTIVE,
-    FILE_TRANS_STATUS_PAUSED_THEM,
-    FILE_TRANS_STATUS_PAUSED_US,
-    //FILE_TRANS_STATUS_PAUSED_BOTH,
-    FILE_TRANS_STATUS_BROKEN,
-    //FILE_TRANS_STATUS_COMPLETED,
-    FILE_TRANS_STATUS_KILLED,
+    FILE_TRANSFER_STATUS_NONE,
+    FILE_TRANSFER_STATUS_ACTIVE,
+    FILE_TRANSFER_STATUS_PAUSED_THEM,
+    FILE_TRANSFER_STATUS_PAUSED_US,
+    //FILE_TRANSFER_STATUS_PAUSED_BOTH,
+    FILE_TRANSFER_STATUS_BROKEN,
+    //FILE_TRANSFER_STATUS_COMPLETED,
+    FILE_TRANSFER_STATUS_KILLED,
     //TODO replace the above and remove these slashes
 };
 
@@ -61,11 +61,12 @@ static void reset_file_transfer(FILE_T *ft, uint64_t start);
 static void callback_file_send_request(Tox *tox, int32_t fid, uint8_t filenumber, uint64_t filesize, const uint8_t *filename, uint16_t filename_length, void *UNUSED(userdata));
 static void callback_file_control(Tox *tox, int32_t fid, uint8_t receive_send, uint8_t filenumber, uint8_t control, const uint8_t *data, uint16_t length, void *UNUSED(userdata));
 static void callback_file_data(Tox *UNUSED(tox), int32_t fid, uint8_t filenumber, const uint8_t *data, uint16_t length, void *UNUSED(userdata));
+/* Callback for file transfer changes made by friend */
+static void file_transfer_callback_remote_control(Tox *tox, uint32_t friend_number, uint32_t file_number, TOX_FILE_CONTROL control, void *UNUSED(userdata));
 /* Function called by core with a new incoming file. */
 static void incoming_file_callback_request(Tox *tox, uint32_t friendnumber, uint32_t filenumber, uint32_t kind, uint64_t file_size, const uint8_t *filename, size_t filename_length, void *user_data);
-static void incoming_file_callback_control(Tox *tox, uint32_t friend_number, uint32_t file_number, TOX_FILE_CONTROL control, void *UNUSED(userdata));
 static void incoming_file_callback_chunk(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position, const uint8_t *data, size_t length, void *user_data);
-
+/* Outgoing files */
 void outgoing_file_send_new(Tox *tox, uint32_t friend_number, uint8_t *path, const uint8_t *filename, size_t filename_length);
 static void outgoing_file_callback_chunk(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position, size_t length, void *user_data);
 

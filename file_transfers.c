@@ -152,44 +152,12 @@ static void reset_file_transfer(FILE_T *ft, uint64_t start){
 // Tox file callbacks
 
 static void callback_file_send_request(Tox *tox, int32_t fid, uint8_t filenumber, uint64_t filesize, const uint8_t *filename, uint16_t filename_length, void *UNUSED(userdata))
-{/* TODO
-    if(filenumber > countof(friend[0].incoming)) {
-        tox_file_send_control(tox, fid, 1, filenumber, TOX_FILECONTROL_KILL, NULL, 0);
-        return;
-    }
-
-    FILE_T *ft = &friend[fid].incoming[filenumber];
-    memset(ft, 0, sizeof(FILE_T));
-
-    ft->fid = fid;
-    ft->filenumber = filenumber;
-    ft->total = filesize;
-
-    filename_length = filename_length > sizeof(ft->name) ? sizeof(ft->name) : filename_length;
-    filename_length = utf8_validate(filename, filename_length);
-
-    ft->name_length = filename_length;
-    memcpy(ft->name, filename, filename_length);
-    debug("File Request %.*s\n", filename_length, filename);
-
-    if(filesize < 1024 * 1024 *4 && filename_length == sizeof("inline.png") - 1 && memcmp(filename, "inline.png", filename_length) == 0) {
-        ft->inline_png = 1;
-        ft->status = FT_SEND;
-
-        ft->data = malloc(filesize);
-
-        tox_file_send_control(tox, fid, 1, filenumber, TOX_FILECONTROL_ACCEPT, NULL, 0);
-
-        //postmessage(FRIEND_FILE_IN_STATUS, fid, filenumber, (void*)FILE_OK);
-        postmessage(FRIEND_FILE_IN_NEW_INLINE, fid, filenumber, NULL);
-    } else {
-        postmessage(FRIEND_FILE_IN_NEW, fid, filenumber, NULL);
-    }*/
+{
 }
 
 static void callback_file_control(Tox *tox, int32_t fid, uint8_t receive_send, uint8_t filenumber, uint8_t control, const uint8_t *data, uint16_t length, void *UNUSED(userdata))
 {/*
-    FILE_T *ft = (receive_send) ? &friend[fid].outgoing[filenumber] : &friend[fid].incoming[filenumber];
+    FILE_T *ft = (receive_send) ? &friend[fid].file_transfer[filenumber] : &friend[fid].file_transfer[filenumber];
 
     switch(control) {
     case TOX_FILECONTROL_ACCEPT: {
@@ -271,45 +239,52 @@ static void callback_file_control(Tox *tox, int32_t fid, uint8_t receive_send, u
     }*/
 }
 
-static void callback_file_data(Tox *UNUSED(tox), int32_t fid, uint8_t filenumber, const uint8_t *data, uint16_t length, void *UNUSED(userdata))
-{
-    FILE_T *ft = &friend[fid].incoming[filenumber];
-    if(ft->inline_png) {
-        memcpy(ft->data + ft->bytes, data, length);
-    } else {
-        fwrite(data, 1, length, ft->data);
-    }
-    ft->bytes += length;
-
-    uint64_t time = get_time();
-    if(time - ft->lastupdate >= 1000 * 1000 * 50) {
-        FILE_PROGRESS *p = malloc(sizeof(FILE_PROGRESS));
-        p->bytes = ft->bytes;
-        p->speed = ((ft->bytes - ft->lastprogress) * 1000 * 1000 * 1000) / (time - ft->lastupdate);
-
-        postmessage(FRIEND_FILE_IN_PROGRESS, fid, filenumber, p);
-
-        ft->lastupdate = time;
-        ft->lastprogress = ft->bytes;
-    }
-}
-
-
 /* Function called by core with a new incoming file. */
 static void incoming_file_callback_request(Tox *tox, uint32_t friend_number, uint32_t file_number, uint32_t kind,
                                  uint64_t file_size, const uint8_t *filename, size_t filename_length, void *user_data){
-
-    debug("incoming file\n");
-    debug("friend %u\n", friend_number);
-    debug("file %u\n", file_number);
-    // file name segfaults debug("name %s\n", *filename);
-    debug("\n");
-    debug("\n");
-    // filename segfaults debug("FileTransfer:\tNew incoming file from friend(%i)\nFileTransfer:\t\tfilename: %s\n", friendnumber, *filename);
     //new incoming file
+    debug("FileTransfer:\tNew incoming file from friend(%i)\nFileTransfer:\t\tfilename: %s\n", friend_number, filename);
+
+    TOX_ERR_FILE_CONTROL error;
+    FILE_T *file_handle = &friend[friend_number].file_transfer[file_number];
+
+    /* if(file_handle->status > 0 ){
+        tox_file_send_control(tox, friend_number, file_number, TOX_FILE_CONTROL_CANCEL, &error);
+        debug("FileTransfer:\tNew incoming file with existing id. Friend(%i)&File(%u).\n", friend_number, file_number);
+        // TODO destroy and reset this file, it has become corrupt across clients.
+        memset(file_handle, 0, sizeof(FILE_T));
+        return;
+    }*/
+
+    // Reset the file handle for new data.
+    file_handle = malloc(sizeof(FILE_T));
+    memset(file_handle, 0, sizeof(FILE_T));
+
+    // Set ids
+    file_handle->fid = friend_number;
+    file_handle->filenumber = file_number;
+    file_handle->total = file_size;
+
+    // FILE_T->filename_length is our max length, make sure that's enforced!
+    filename_length = filename_length > sizeof(file_handle->name) ? sizeof(file_handle->name) : filename_length;
+    filename_length = utf8_validate(filename, filename_length);
+    file_handle->name_length = filename_length;
+    memcpy(file_handle->name, filename, filename_length);
+
+    // If it's a small inline image, just accept it!
+    if( file_size < 1024 * 1024 * 4 && filename_length == sizeof("utox-inline.png") - 1 &&
+                                memcmp(filename, "utox-inline.png", filename_length) == 0) {
+        file_handle->inline_png = 1;
+        file_handle->status = FILE_TRANSFER_STATUS_ACTIVE;
+        file_handle->data = malloc(file_size);
+        tox_file_send_control(tox, friend_number, file_number, TOX_FILE_CONTROL_RESUME, &error);
+        postmessage(FRIEND_FILE_IN_NEW_INLINE, friend_number, file_number, NULL);
+    } else {
+        postmessage(FRIEND_FILE_IN_NEW, friend_number, file_number, NULL);
+    }
 }
 
-static void incoming_file_callback_control(Tox *tox, uint32_t friend_number, uint32_t file_number,
+static void file_transfer_callback_remote_control(Tox *tox, uint32_t friend_number, uint32_t file_number,
                                                                     TOX_FILE_CONTROL control, void *UNUSED(userdata)){
     switch(control){
         case TOX_FILE_CONTROL_RESUME:
@@ -332,23 +307,42 @@ static void incoming_file_callback_chunk(Tox *tox, uint32_t friend_number, uint3
                                                                 const uint8_t *data, size_t length, void *user_data){
     debug("FileTransfer:\tIncoming chunk for friend_id (%u), and file_id (%u). Start (%u), End (%u).\r",
                                                                       friend_number, file_number, position, length);
-    FILE_T *file_handle = &friend[friend_number].incoming[file_number];
-    FILE *file = file_handle->data;
-    uint64_t last_bit = position + length;
-
-    fseeko(file, 0, position);
-    size_t write_size = fwrite(data, 1, length, file);
-
-    if(write_size != length){
-        debug("\n\nFileTransfer:\tERROR WRITING DATA TO FILE! (%u & %u)\n\n", friend_number, file_number);
-        tox_postmessage(TOX_FILE_INCOMING_CANCEL, friend_number, file_number, NULL);
+    if(length == 0){
+        debug("\nFileTransfer:\tIncoming transfer is done (%u & %u)\n", friend_number, file_number);
         return;
     }
 
     TOX_ERR_FILE_SEND_CHUNK error;
-    if(last_bit == file_handle->total){
-        debug("\nFileTransfer:\tIncoming transfer is done (%u & %u)\n", friend_number, file_number);
+    FILE_T *file_handle = &friend[friend_number].file_transfer[file_number];
+    FILE *file = file_handle->data;
+    uint64_t last_bit = position + length;
+    uint64_t time = get_time();
+
+    if(file_handle->inline_png) {
+        memcpy(file_handle->data + file_handle->bytes, data, length);
+    } else {
+        fseeko(file, 0, position);
+        size_t write_size = fwrite(data, 1, length, file);
+        if(write_size != length){
+            debug("\n\nFileTransfer:\tERROR WRITING DATA TO FILE! (%u & %u)\n\n", friend_number, file_number);
+            tox_postmessage(TOX_FILE_INCOMING_CANCEL, friend_number, file_number, NULL);
+            return;
+        }
     }
+    file_handle->bytes += length;
+
+    if(time - file_handle->lastupdate >= 1000 * 1000 * 50) {
+    // TODO divide total size by total time to get ave speed.
+    // include last active, and total paused time to exclude paused time.
+        FILE_PROGRESS *p = malloc(sizeof(FILE_PROGRESS));
+        p->bytes = file_handle->bytes;
+        p->speed = ( (file_handle->bytes - file_handle->lastprogress) * 1000 * 1000 * 1000)
+                        / (time - file_handle->lastupdate);
+        postmessage(FRIEND_FILE_IN_PROGRESS, friend_number, file_number, p);
+        file_handle->lastupdate = time;
+        file_handle->lastprogress = file_handle->bytes;
+    }
+
 }
 
 void outgoing_file_send_new(Tox *tox, uint32_t friend_id, uint8_t *path, const uint8_t *filename, size_t filename_length){
@@ -357,7 +351,7 @@ void outgoing_file_send_new(Tox *tox, uint32_t friend_id, uint8_t *path, const u
 
     if (friend[friend_id].count_outgoing >= MAX_FILE_TRANSFERS || (file_tend - file_t) >= countof(file_t)) {
         debug("FileTransfer:\tMaximum outgoing file sending limit reached(%u/%u) for friend(%u). ABORTING!\n",
-                                                    friend[friend_id].count_outgoing, MAX_FILE_TRANSFERS, friend_id);
+                                                    friend[friend_id].count_transfers, MAX_FILE_TRANSFERS, friend_id);
         return;
     }
 
@@ -377,7 +371,7 @@ void outgoing_file_send_new(Tox *tox, uint32_t friend_id, uint8_t *path, const u
     int filenumber = tox_file_send(tox, friend_id, TOX_FILE_KIND_DATA, file_size, filename, filename_length, &error);
 
     if(filenumber != -1) {
-        FILE_T *active_transfer = &friend[friend_id].outgoing[filenumber];
+        FILE_T *active_transfer = &friend[friend_id].file_transfer[filenumber];
         memset(active_transfer, 0, sizeof(FILE_T));
 
         *file_tend++ = active_transfer;
@@ -419,7 +413,7 @@ static void outgoing_file_callback_chunk(Tox *tox, uint32_t friend_number, uint3
     uint8_t *buffer;
     buffer = malloc(length);
 
-    FILE_T *file_handle = &friend[friend_number].outgoing[file_number];
+    FILE_T *file_handle = &friend[friend_number].file_transfer[file_number];
     FILE *file = file_handle->data;
     uint64_t last_bit = position + length;
 
@@ -450,7 +444,7 @@ void utox_set_callbacks_for_transfer(Tox *tox){/*
     /* This is the callback for a new incoming file. */
     tox_callback_file_receive(tox, incoming_file_callback_request, NULL);
     /* This is the callback with friend's actions for a file */
-    tox_callback_file_recv_control(tox, incoming_file_callback_control, NULL);
+    tox_callback_file_recv_control(tox, file_transfer_callback_remote_control, NULL);
     /* This is the callback with a chunk data for a file. */
     tox_callback_file_receive_chunk(tox, incoming_file_callback_chunk, NULL);
     /* Outgoing files */

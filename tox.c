@@ -1082,7 +1082,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          * param2: file #
          * data: path to write file
          */
-        FILE_T *ft = &friend[param1].incoming[param2];
+        FILE_T *ft = &friend[param1].file_transfer[param2];
         ft->data = fopen(data, "wb");
         if(!ft->data) {
             free(data);
@@ -1092,7 +1092,8 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         ft->path = data;
         ft->status = FT_SEND;
 
-        //TODO tox_file_send_control(tox, param1, 1, param2, TOX_FILECONTROL_ACCEPT, NULL, 0);
+        TOX_ERR_FILE_CONTROL error;
+        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME, &error);
 
         postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_OK);
         break;
@@ -1122,7 +1123,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         /* param1: friend #
          * param2: file #
          */
-        FILE_T *ft = &friend[param1].incoming[param2];
+        FILE_T *ft = &friend[param1].file_transfer[param2];
         if(ft->data) {
             if(ft->inline_png) {
                 free(ft->data);
@@ -1144,7 +1145,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         /* param1: friend #
          * param2: file #
          */
-        FILE_T *ft = &friend[param1].outgoing[param2];
+        FILE_T *ft = &friend[param1].file_transfer[param2];
         ft->status = FT_SEND;
         TOX_ERR_FILE_CONTROL error;
                         /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
@@ -1156,7 +1157,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         /* param1: friend #
          * param2: file #
          */
-        FILE_T *ft = &friend[param1].outgoing[param2];
+        FILE_T *ft = &friend[param1].file_transfer[param2];
         ft->status = FT_PAUSE;
         TOX_ERR_FILE_CONTROL error;
                         /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
@@ -1168,7 +1169,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         /* param1: friend #
          * param2: file #
          */
-        FILE_T *ft = &friend[param1].outgoing[param2];
+        FILE_T *ft = &friend[param1].file_transfer[param2];
         ft->status = FT_KILL;
         TOX_ERR_FILE_CONTROL error;
                         /*    tox, friend#, file#,      CANCEL_FILE,     error_code */

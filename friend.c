@@ -222,7 +222,7 @@ void friend_free(FRIEND *f)
         case MSG_TYPE_FILE: {
             MSG_FILE *file = (void*)msg;
             free(file->path);
-            FILE_T *ft = &f->incoming[file->filenumber];
+            FILE_T *ft = &f->file_transfer[file->filenumber];
             if(ft->data) {
                 if(ft->inline_png) {
                     free(ft->data);
