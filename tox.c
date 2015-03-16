@@ -1005,8 +1005,6 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
          */
 
         if(param2 == 0xFFFF) {
-            debug("linux file transfers not supported\n");
-            break; // TODO : linux support
             //paths with line breaks
             uint8_t *name = data, *p = data, *s = name;
             while(*p) {
@@ -1027,8 +1025,8 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
                 if(strcmp2(name, "file://") == 0) {
                     name += 7;
                 }
-
-                utox_transfer_start_file(tox, param1, name, s, p - s);
+                                    /* tox, friend, path, filename, filename_length */
+                outgoing_file_send_new(tox, param1, name,        s,           p - s);
                 p++;
                 s = name = p;
 
