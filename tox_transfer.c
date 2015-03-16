@@ -68,8 +68,8 @@ void utox_transfer_start_file(Tox *tox, uint32_t fid, uint8_t *path, uint8_t *na
         ft->path = (uint8_t*)strdup((char*)path);
 
         ft->data = file;
-        ft->buffer = malloc(ft->sendsize);
-        fillbuffer(ft);
+        // ft->buffer = malloc(ft->sendsize);
+        // fillbuffer(ft);
 
         postmessage(FRIEND_FILE_OUT_NEW, fid, filenumber, NULL);
         ++friend[fid].count_outgoing;
@@ -296,12 +296,12 @@ static void callback_file_data(Tox *UNUSED(tox), int32_t fid, uint8_t filenumber
 
 
 /* Function called by core with a new incoming file. */
-static void incoming_file_callback_request(Tox *tox, uint32_t friendnumber, uint32_t filenumber, uint32_t kind,
+static void incoming_file_callback_request(Tox *tox, uint32_t friend_number, uint32_t file_number, uint32_t kind,
                                  uint64_t file_size, const uint8_t *filename, size_t filename_length, void *user_data){
 
     debug("incoming file\n");
-    debug("friend %u\n", friendnumber);
-    debug("file %i\n", filenumber);
+    debug("friend %u\n", friend_number);
+    debug("file %u\n", file_number);
     // file name segfaults debug("name %s\n", *filename);
     debug("\n");
     debug("\n");
@@ -313,7 +313,11 @@ static void incoming_file_callback_control(Tox *tox, uint32_t friend_number, uin
                                                                     TOX_FILE_CONTROL control, void *UNUSED(userdata)){
     switch(control){
         case TOX_FILE_CONTROL_RESUME:
+            // if not started
+            debug("FileTransfer:\tFriend (%i) has accepted file (%i)\n", friend_number, file_number);
+            // else
             debug("FileTransfer:\tFriend (%i) has resumed file (%i)\n", friend_number, file_number);
+
             break;
         case TOX_FILE_CONTROL_PAUSE:
             debug("FileTransfer:\tFriend (%i) has paused file (%i)\n", friend_number, file_number);
@@ -346,7 +350,7 @@ void outgoing_file_send_new(Tox *tox, uint32_t friend_id, uint8_t *path, const u
     }
 
 
-    TOX_ERR_FILE_SEND *error;
+    TOX_ERR_FILE_SEND error;
     uint64_t file_size = 0;
     fseeko(file, 0, SEEK_END);
     file_size = ftello(file);
