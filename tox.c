@@ -660,7 +660,6 @@ void tox_thread(void *UNUSED(args))
             }
 
             // Thread active transfers and check if friend is typing
-            utox_thread_work_for_transfers(tox, time);
             utox_thread_work_for_typing_notifications(tox, time);
 
             // Ask toxcore how many ms to wait, then wait at the most 20ms
@@ -1080,101 +1079,61 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
     case TOX_ACCEPTFILE: {
         /* param1: friend #
          * param2: file #
-         * data: path to write file
-         */
-        FILE_T *ft = &friend[param1].file_transfer[param2];
-        ft->data = fopen(data, "wb");
-        if(!ft->data) {
-            free(data);
-            break;
-        }
-
-        ft->path = data;
-        ft->status = FT_SEND;
-
-        TOX_ERR_FILE_CONTROL error;
-        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME, &error);
-
-        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_OK);
+         * data: path to write file */
+        utox_file_start_write(param1, param2, data);
+        /*                    tox, friend#, file#,       RESUME_FILE */
+        file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME);
+        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_TRANSFER_STATUS_ACTIVE);
         break;
     }
 
     case TOX_FILE_INCOMING_RESUME:{
         /* param1: friend #
          * param2: file #
-         */
-        TOX_ERR_FILE_CONTROL error;
-                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
-        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME, &error);
-        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_OK);
+                                    tox, friend#, file#,       RESUME_FILE */
+        file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME);
+        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_TRANSFER_STATUS_ACTIVE);
         break;
     }
     case TOX_FILE_INCOMING_PAUSE:{
         /* param1: friend #
          * param2: file #
-         */
-        TOX_ERR_FILE_CONTROL error;
-                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
-        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_PAUSE, &error);
-        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_PAUSED);
+                                    tox, friend#, file#,       PAUSE_FILE */
+        file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_PAUSE);
+        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_TRANSFER_STATUS_PAUSED_US);
         break;
     }
     case TOX_FILE_INCOMING_CANCEL:{
         /* param1: friend #
          * param2: file #
-         */
-        FILE_T *ft = &friend[param1].file_transfer[param2];
-        if(ft->data) {
-            if(ft->inline_png) {
-                free(ft->data);
-            } else {
-                fclose(ft->data);
-                free(ft->path);
-            }
-        }
-
-        ft->status = FT_NONE;
-        TOX_ERR_FILE_CONTROL error;
-                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
-        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_CANCEL, &error);
-        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_KILLED);
+                                    tox, friend#, file#,       CANCEL_FILE */
+        file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_CANCEL);
+        postmessage(FRIEND_FILE_IN_STATUS, param1, param2, (void*)FILE_TRANSFER_STATUS_KILLED);
         break;
     }
 
     case TOX_FILE_OUTGOING_RESUME:{
         /* param1: friend #
          * param2: file #
-         */
-        FILE_T *ft = &friend[param1].file_transfer[param2];
-        ft->status = FT_SEND;
-        TOX_ERR_FILE_CONTROL error;
-                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
-        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME, &error);
-        postmessage(FRIEND_FILE_OUT_STATUS, param1, param2, (void*)FILE_OK);
+                                    tox, friend#, file#,       RESUME_FILE */
+        file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_RESUME);
+        postmessage(FRIEND_FILE_OUT_STATUS, param1, param2, (void*)FILE_TRANSFER_STATUS_ACTIVE);
         break;
     }
     case TOX_FILE_OUTGOING_PAUSE:{
         /* param1: friend #
          * param2: file #
-         */
-        FILE_T *ft = &friend[param1].file_transfer[param2];
-        ft->status = FT_PAUSE;
-        TOX_ERR_FILE_CONTROL error;
-                        /*    tox, friend#, file#,      PAUSE_FILE,     error_code */
-        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_PAUSE, &error);
-        postmessage(FRIEND_FILE_OUT_STATUS, param1, param2, (void*)FILE_PAUSED);
+                                    tox, friend#, file#,       PAUSE_FILE */
+        file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_PAUSE);
+        postmessage(FRIEND_FILE_OUT_STATUS, param1, param2, (void*)FILE_TRANSFER_STATUS_PAUSED_US);
         break;
     }
     case TOX_FILE_OUTGOING_CANCEL:{
         /* param1: friend #
          * param2: file #
-         */
-        FILE_T *ft = &friend[param1].file_transfer[param2];
-        ft->status = FT_KILL;
-        TOX_ERR_FILE_CONTROL error;
-                        /*    tox, friend#, file#,      CANCEL_FILE,     error_code */
-        tox_file_send_control(tox, param1, param2, TOX_FILE_CONTROL_CANCEL, &error);
-        postmessage(FRIEND_FILE_OUT_STATUS, param1, param2, (void*)FILE_KILLED);
+                                    tox, friend#, file#,      CANCEL_FILE */
+        file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_CANCEL);
+        postmessage(FRIEND_FILE_OUT_STATUS, param1, param2, (void*)FILE_TRANSFER_STATUS_KILLED);
         break;
     }
 
@@ -1189,19 +1148,20 @@ static void file_notify(FRIEND *f, MSG_FILE *msg)
     STRING *str;
 
     switch(msg->status) {
-    case FILE_PENDING:
+    case FILE_TRANSFER_STATUS_NONE:
         str = SPTR(TRANSFER_NEW); break;
-    case FILE_OK:
+    case FILE_TRANSFER_STATUS_ACTIVE:
         str = SPTR(TRANSFER_STARTED); break;
-    case FILE_PAUSED:
+    case FILE_TRANSFER_STATUS_PAUSED_BOTH:
         str = SPTR(TRANSFER___); break;
-    case FILE_PAUSED_OTHER:
+    case FILE_TRANSFER_STATUS_PAUSED_US:
+    case FILE_TRANSFER_STATUS_PAUSED_THEM:
         str = SPTR(TRANSFER_PAUSED); break;
-    case FILE_KILLED:
+    case FILE_TRANSFER_STATUS_KILLED:
         str = SPTR(TRANSFER_CANCELLED); break;
-    case FILE_DONE:
+    case FILE_TRANSFER_STATUS_COMPLETED:
         str = SPTR(TRANSFER_COMPLETE); break;
-    case FILE_BROKEN:
+    case FILE_TRANSFER_STATUS_BROKEN:
     default: //render unknown status as "transfer broken"
         str = SPTR(TRANSFER_BROKEN); break;
     }
@@ -1617,16 +1577,16 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     case FRIEND_FILE_IN_NEW:
     case FRIEND_FILE_IN_NEW_INLINE: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->incoming[param2];
+        FILE_TRANSFER *ft = &f->active_transfer[param2];
         _Bool inline_png = (tox_message_id == FRIEND_FILE_IN_NEW_INLINE);
 
         MSG_FILE *msg = malloc(sizeof(MSG_FILE));
         msg->author = 0;
         msg->msg_type = MSG_TYPE_FILE;
         msg->filenumber = param2;
-        msg->status = (inline_png ? FILE_OK : FILE_PENDING);
+        msg->status = (inline_png ? FILE_TRANSFER_STATUS_ACTIVE : FILE_TRANSFER_STATUS_NONE);
         msg->name_length = (ft->name_length > sizeof(msg->name)) ? sizeof(msg->name) : ft->name_length;
-        msg->size = ft->total;
+        msg->size = ft->size;
         msg->progress = 0;
         msg->speed = 0;
         msg->inline_png = inline_png;
@@ -1634,7 +1594,7 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         memcpy(msg->name, ft->name, msg->name_length);
 
         friend_addmessage(f, msg);
-        ft->chatdata = msg;
+        // ft->chatdata = msg;
 
         file_notify(f, msg);
 
@@ -1645,16 +1605,16 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     case FRIEND_FILE_OUT_NEW:
     case FRIEND_FILE_OUT_NEW_INLINE: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->outgoing[param2];
+        FILE_TRANSFER *ft = &f->active_transfer[param2];
         _Bool inline_png = (tox_message_id == FRIEND_FILE_OUT_NEW_INLINE);
 
         MSG_FILE *msg = malloc(sizeof(MSG_FILE));
         msg->author = 1;
         msg->msg_type = MSG_TYPE_FILE;
         msg->filenumber = param2;
-        msg->status = FILE_PENDING;
+        msg->status = FILE_TRANSFER_STATUS_NONE;
         msg->name_length = (ft->name_length >= sizeof(msg->name)) ? sizeof(msg->name) - 1 : ft->name_length;
-        msg->size = ft->total;
+        msg->size = ft->size;
         msg->progress = 0;
         msg->speed = 0;
         msg->inline_png = inline_png;
@@ -1663,7 +1623,7 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         msg->name[msg->name_length] = 0;
 
         friend_addmessage(f, msg);
-        ft->chatdata = msg;
+        // ft->chatdata = msg;
 
         updatefriend(f);
         break;
@@ -1671,12 +1631,13 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_FILE_IN_STATUS: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->incoming[param2];
+        // FILE_TRANSFER *ft = &f->active_transfer[param2];
 
-        MSG_FILE *msg = ft->chatdata;
-        msg->status = (size_t)data;
+        // TODO call this from the callback
+        // MSG_FILE *msg = ft->chatdata;
+        // msg->status = (size_t)data;
 
-        file_notify(f, msg);
+        // file_notify(f, msg);
 
         updatefriend(f);
         break;
@@ -1684,12 +1645,12 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_FILE_OUT_STATUS: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->outgoing[param2];
+        // FILE_TRANSFER *ft = &f->active_transfer[param2];
 
-        MSG_FILE *msg = ft->chatdata;
-        msg->status = (size_t)data;
+        // MSG_FILE *msg = ft->chatdata;
+        // msg->status = (size_t)data;
 
-        file_notify(f, msg);
+        // file_notify(f, msg);
 
         updatefriend(f);
         break;
@@ -1697,13 +1658,13 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_FILE_IN_DONE: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->incoming[param2];
+        // FILE_TRANSFER *ft = &f->active_transfer[param2];
 
-        MSG_FILE *msg = ft->chatdata;
-        msg->status = FILE_DONE;
-        msg->path = data;
+        // MSG_FILE *msg = ft->chatdata;
+        // msg->status = FILE_TRANSFER_STATUS_COMPLETED;
+        // msg->path = data;
 
-        file_notify(f, msg);
+        // file_notify(f, msg);
 
         updatefriend(f);
         break;
@@ -1711,15 +1672,15 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_FILE_IN_DONE_INLINE: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->incoming[param2];
+        // FILE_TRANSFER *ft = &f->active_transfer[param2];
 
-        MSG_FILE *msg = ft->chatdata;
-        msg->status = FILE_DONE;
-        msg->path = data;
+        // MSG_FILE *msg = ft->chatdata;
+        // msg->status = FILE_TRANSFER_STATUS_COMPLETED;
+        // msg->path = data;
 
-        friend_recvimage(f, data, msg->size);
+        // friend_recvimage(f, data, msg->size);
 
-        file_notify(f, msg);
+        // file_notify(f, msg);
 
         updatefriend(f);
         break;
@@ -1727,13 +1688,13 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_FILE_OUT_DONE: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->outgoing[param2];
+        // FILE_TRANSFER *ft = &f->active_transfer[param2];
 
-        MSG_FILE *msg = ft->chatdata;
-        msg->status = FILE_DONE;
-        msg->path = data;
+        // MSG_FILE *msg = ft->chatdata;
+        // msg->status = FILE_TRANSFER_STATUS_COMPLETED;
+        // msg->path = data;
 
-        file_notify(f, msg);
+        // file_notify(f, msg);
 
         updatefriend(f);
         break;
@@ -1741,14 +1702,14 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_FILE_IN_PROGRESS: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->incoming[param2];
-        FILE_PROGRESS *p = data;
+        // FILE_TRANSFER *ft = &f->active_transfer[param2];
+        // FILE_PROGRESS *p = data;
 
-        MSG_FILE *msg = ft->chatdata;
-        msg->progress = p->bytes;
-        msg->speed = p->speed;
+        // MSG_FILE *msg = ft->chatdata;
+        // msg->progress = p->bytes;
+        // msg->speed = p->speed;
 
-        free(p);
+        // free(p);
 
         updatefriend(f);
         break;
@@ -1756,14 +1717,14 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_FILE_OUT_PROGRESS: {
         FRIEND *f = &friend[param1];
-        FILE_T *ft = &f->outgoing[param2];
-        FILE_PROGRESS *p = data;
+        // FILE_TRANSFER *ft = &f->active_transfer[param2];
+        // FILE_PROGRESS *p = data;
 
-        MSG_FILE *msg = ft->chatdata;
-        msg->progress = p->bytes;
-        msg->speed = p->speed;
+        // MSG_FILE *msg = ft->chatdata;
+        // msg->progress = p->bytes;
+        // msg->speed = p->speed;
 
-        free(p);
+        // free(p);
 
         updatefriend(f);
         break;

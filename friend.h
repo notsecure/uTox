@@ -1,6 +1,3 @@
-
-#define MAX_FILE_TRANSFERS 32
-
 typedef struct friend {
     _Bool online, typing, notify;
     uint8_t calling, status;
@@ -18,8 +15,8 @@ typedef struct friend {
 
     AVATAR avatar;
 
-    FILE_T file_transfer[MAX_FILE_TRANSFERS];
-    uint16_t count_transfers;
+    FILE_TRANSFER active_transfer[MAX_FILE_TRANSFERS];
+    uint16_t transfer_count;
 } FRIEND;
 
 #define MAX_GROUP_PEERS 256
