@@ -41,11 +41,11 @@ void file_transfer_local_control(Tox *tox, uint32_t friend_number, uint32_t file
 static void file_transfer_callback_control(Tox *tox, uint32_t friend_number, uint32_t file_number,
                                                                     TOX_FILE_CONTROL control, void *UNUSED(userdata)){
 
-    FILE_TRANSFER *info = &active_transfer[friend_number][file_number];
-    if(info->incoming){
-        file_number = (info->file_number + 1) << 16;
-    }
 
+    if(file_number > 65536) {
+        file_number = (file_number >> 16) - 1;
+    }
+    FILE_TRANSFER *info = &active_transfer[friend_number][file_number];
 
     switch(control){
         case TOX_FILE_CONTROL_RESUME:
