@@ -250,9 +250,9 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
                 drawalpha(BM_FT, ftbar_x, ftbar_y, ftbar_w, ftbar_h, (mouse_tbtn || mouse_bbtn) ? COLOR_BUTTON_SUCCESS_HOVER_BACKGROUND : COLOR_BUTTON_SUCCESS_BACKGROUND);
                 drawalpha(BM_YES, btnx, bbtn_y, btnw, btnh, (mouse_tbtn || mouse_bbtn) ? COLOR_BUTTON_SUCCESS_HOVER_TEXT : COLOR_BUTTON_SUCCESS_TEXT);
                 if(file->inline_png){
-                    drawstr(x + dx + 5 * SCALE, y + 17 * SCALE, CLICKTOOPEN);
-                } else {
                     drawstr(x + dx + 5 * SCALE, y + 17 * SCALE, CLICKTOSAVE);
+                } else {
+                    drawstr(x + dx + 5 * SCALE, y + 17 * SCALE, CLICKTOOPEN);
                 }
                 break;
             }
@@ -272,6 +272,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
 
                 drawalpha(BM_FTB2, btn_bg_x, bbtn_bg_y, btn_bg_w, bbtn_bg_h, (mouse_bbtn ? COLOR_BUTTON_SUCCESS_BACKGROUND : COLOR_BUTTON_SUCCESS_HOVER_BACKGROUND));
                 drawalpha(BM_YES, btnx, bbtn_y, btnw, btnh, (mouse_bbtn ? COLOR_BUTTON_SUCCESS_HOVER_TEXT : COLOR_BUTTON_SUCCESS_TEXT));
+                framerect((x + dx) + 5 * SCALE, y + 17 * SCALE, (x + dx) + 111 * SCALE, y + 24 * SCALE, COLOR_BUTTON_INPROGRESS_TEXT);
 
                 setcolor(COLOR_BUTTON_DISABLED_TRANSFER);
                 break;
@@ -286,6 +287,7 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
                 setcolor(COLOR_BUTTON_INPROGRESS_TEXT);
                 drawtext(x + dx + 5 * SCALE + 53 * SCALE - textwidth(text, len) / 2, y + 10 * SCALE, text, len);
                 drawtext(x + dx + 5 * SCALE + 106 * SCALE - textwidth(text, len2), y + 10 * SCALE, text, len2);
+                framerect((x + dx) + 5 * SCALE, y + 17 * SCALE, (x + dx) + 111 * SCALE, y + 24 * SCALE, COLOR_BUTTON_INPROGRESS_TEXT);
                 break;
             }
             case FILE_TRANSFER_STATUS_PAUSED_US:
@@ -304,13 +306,14 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
                     drawalpha(BM_FTB2, btn_bg_x, bbtn_bg_y, btn_bg_w, bbtn_bg_h, (!mouse_bbtn ? COLOR_BUTTON_SUCCESS_BACKGROUND : COLOR_BUTTON_DISABLED_BACKGROUND));
                     drawalpha(BM_PAUSE, btnx, bbtn_y, btnw, btnh, (mouse_bbtn ? COLOR_BUTTON_SUCCESS_HOVER_TEXT : COLOR_BUTTON_SUCCESS_TEXT));
                 }
+                framerect((x + dx) + 5 * SCALE, y + 17 * SCALE, (x + dx) + 111 * SCALE, y + 24 * SCALE, COLOR_BUTTON_INPROGRESS_TEXT);
                 break;
             }
             }
             // progress rectangle
             setcolor(COLOR_BUTTON_INPROGRESS_TEXT);
             uint32_t w = (file->size == 0) ? 0 : (progress * (uint64_t)106 * SCALE) / file->size;
-            framerect((x + dx) + 5 * SCALE, y + 17 * SCALE, (x + dx) + 111 * SCALE, y + 24 * SCALE, COLOR_BUTTON_INPROGRESS_TEXT);
+
             drawrectw((x + dx) + 5 * SCALE, y + 17 * SCALE, w, 7 * SCALE, COLOR_BUTTON_INPROGRESS_TEXT);
 
 

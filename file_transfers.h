@@ -46,3 +46,12 @@ void utox_file_start_write(uint32_t friend_number, uint32_t file_number, void *f
 void utox_set_callbacks_for_transfer(Tox *tox);
 
 static void utox_update_user_file(FILE_TRANSFER *file);
+static void utox_run_file();
+
+// Empty
+static void utox_kill_file();
+static void utox_break_file();
+static void utox_pause_file();
+static void utox_complete_file();
+static void utox_resume_broke_file();
+

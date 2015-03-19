@@ -17,6 +17,7 @@ void file_transfer_local_control(Tox *tox, uint32_t friend_number, uint32_t file
             debug("FileTransfer:\tWe just accepted file (%u)\n", friend_number, file_number);
             // else
             debug("FileTransfer:\tWe just resumed file (%u)\n", friend_number, file_number);
+            utox_run_file(info);
             tox_file_send_control(tox, friend_number, file_number, control, &error);
             break;
         case TOX_FILE_CONTROL_PAUSE:
@@ -39,13 +40,20 @@ void file_transfer_local_control(Tox *tox, uint32_t friend_number, uint32_t file
 
 static void file_transfer_callback_control(Tox *tox, uint32_t friend_number, uint32_t file_number,
                                                                     TOX_FILE_CONTROL control, void *UNUSED(userdata)){
+
+    FILE_TRANSFER *info = &active_transfer[friend_number][file_number];
+    if(info->incoming){
+        file_number = (info->file_number + 1) << 16;
+    }
+
+
     switch(control){
         case TOX_FILE_CONTROL_RESUME:
             // if not started
             debug("FileTransfer:\tFriend (%i) has accepted file (%i)\n", friend_number, file_number);
             // else
             debug("FileTransfer:\tFriend (%i) has resumed file (%i)\n", friend_number, file_number);
-
+            utox_run_file(info);
             break;
         case TOX_FILE_CONTROL_PAUSE:
             debug("FileTransfer:\tFriend (%i) has paused file (%i)\n", friend_number, file_number);
@@ -110,13 +118,19 @@ static void incoming_file_callback_chunk(Tox *tox, uint32_t friend_number, uint3
     file_number = (file_number >> 16) - 1;
     debug("FileTransfer:\tIncoming chunk for friend (%u), and file (%u). Start (%u), End (%u).\r",
                                                                       friend_number, file_number, position, length);
-    if(length == 0){
-        debug("\nFileTransfer:\tIncoming transfer is done (%u & %u)\n", friend_number, file_number);
-        return;
-    }
 
     TOX_ERR_FILE_SEND_CHUNK error;
     FILE_TRANSFER *file_handle = &active_transfer[friend_number][file_number];
+
+    if(length == 0){
+        debug("\nFileTransfer:\tIncoming transfer is done (%u & %u)\n", friend_number, file_number);
+        file_handle->status = FILE_TRANSFER_STATUS_COMPLETED;
+        if(!file_handle->in_memory){
+            fclose(file_handle->file);
+        }
+        return;
+    }
+
     uint64_t last_bit = position + length;
     time_t time_e = time(NULL);
 
@@ -230,6 +244,8 @@ static void outgoing_file_callback_chunk(Tox *tox, uint32_t friend_number, uint3
     tox_file_send_chunk(tox, friend_number, file_number, position, data, length, &error);
     if(last_bit == file_handle->size){
         debug("FileTransfer:\tOutgoing transfer is done (%u & %u)\n", friend_number, file_number);
+        file_handle->status = FILE_TRANSFER_STATUS_COMPLETED;
+        utox_update_user_file(file_handle);
     }
     free(buffer);
 }
@@ -263,14 +279,19 @@ void utox_set_callbacks_for_transfer(Tox *tox){/*
 /* The following are internal file status commands */
 
 static void utox_update_user_file(FILE_TRANSFER *file){
-        MSG_FILE *msg = file->ui_data;
-        msg->status = file->status;
-        msg->progress = file->size_transferred;
-        msg->speed = 0;
-        msg->path = file->path;
+    MSG_FILE *msg = file->ui_data;
+    msg->status = file->status;
+    msg->progress = file->size_transferred;
+    msg->speed = 0;
+    msg->path = file->path;
 }
 
-
+static void utox_run_file(FILE_TRANSFER *file){
+    file->status = FILE_TRANSFER_STATUS_ACTIVE;
+    utox_update_user_file(file);
+}
 static void utox_kill_file(){}
+static void utox_break_file(){}
 static void utox_pause_file(){}
-static void utox_resume_broke_file(){}
+static void utox_complete_file(){}
+static void utox_resume_broken_file(){}
