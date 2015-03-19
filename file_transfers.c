@@ -42,7 +42,7 @@ static void file_transfer_callback_control(Tox *tox, uint32_t friend_number, uin
                                                                     TOX_FILE_CONTROL control, void *UNUSED(userdata)){
 
 
-    if(file_number > 65536) {
+    if(file_number >= 65536) {
         file_number = (file_number >> 16) - 1;
     }
     FILE_TRANSFER *info = &active_transfer[friend_number][file_number];
