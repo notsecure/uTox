@@ -120,23 +120,30 @@ static void callback_read_receipt(Tox *UNUSED(tox), uint32_t fid, uint32_t recei
 }
 
 static void callback_connection_status(Tox *tox, uint32_t fid, TOX_CONNECTION status, void *UNUSED(userdata)){
+    FRIEND *f = &friend[fid];
+
+    f->conn_status = status;
     // todo call avatar sending
 
+    if(f->online){
+        if(status){
+            /* Friend already online, just update the conn_status */
+            return;
+        } else {
+            debug("Friend (%u):\t Offline\n", fid);
+            f->online = 0;
+            ft_friend_offline(tox, fid);
+        }
+    } else if(!f->online){
+        if(status){
+            debug("Friend (%u):\t Online\n", fid);
+            ft_friend_online(tox, fid);
+            avatar_on_friend_online(tox, fid);
+        } else {
+            /* Do nothing... */
+        }
+    }
     postmessage(FRIEND_ONLINE, fid, !!status, NULL);
-
-    if(!status) {
-        ft_friend_offline(tox, fid);
-    } else {
-        ft_friend_online(tox, fid);
-        /* resend avatar info (in case it changed) */
-        avatar_on_friend_online(tox, fid);
-    }
-
-    if(status){
-        debug("Friend (%u):\t Online\n", fid);
-    } else {
-        debug("Friend (%u):\t Offline\n", fid);
-    }
 }
 
 void callback_av_group_audio(Tox *tox, int groupnumber, int peernumber, const int16_t *pcm, unsigned int samples,

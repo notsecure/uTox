@@ -1405,12 +1405,6 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
 
     case FRIEND_ONLINE: {
         FRIEND *f = &friend[param1];
-
-        if (f->online == param2) {
-            break;
-        }
-
-        f->online = param2;
         if(!f->online) {
             friend_set_typing(f, 0);
         }
