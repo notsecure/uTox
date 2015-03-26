@@ -1,5 +1,6 @@
 typedef struct friend {
     _Bool online, typing, notify;
+    TOX_CONNECTION conn_status;
     uint8_t calling, status;
     int32_t callid;
     uint16_t call_width, call_height;

@@ -1409,13 +1409,31 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     }
 
     case FRIEND_ONLINE: {
+        /* param1 : friend number
+           param2 : status from toxcore */
         FRIEND *f = &friend[param1];
 
-        if (f->online == param2) {
-            break;
-        }
+        f->conn_status = param2;
+        // todo call avatar sending
 
-        f->online = param2;
+        if(f->online){
+            if(param2){
+                /* Friend already online, just update the conn_status */
+                break;
+            } else {
+                debug("Friend (%u):\t Offline\n", param1);
+                f->online = 0;
+                ft_friend_offline(tox, param1);
+            }
+        } else if(!f->online){
+            if(param2){
+                debug("Friend (%u):\t Online\n", param1);
+                ft_friend_online(tox, param1);
+                avatar_on_friend_online(tox, param1);
+            } else {
+                /* Do nothing... */
+            }
+
         if(!f->online) {
             friend_set_typing(f, 0);
         }
