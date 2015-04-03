@@ -413,6 +413,16 @@ static void load_defaults(Tox *tox)
     self.statusmsg_length = status_len;
     self.statusmsg = malloc(status_len);
     memcpy(self.statusmsg, status, status_len);
+
+    /* We're loading default, so lets backup the original to be safe */
+    uint8_t backup_path[512], save_path[512], *p;
+    int path_length = datapath(save_path);
+    p = save_path + path_length;
+    memcpy(p, "tox_save.tox", sizeof("tox_save.tox"));
+    memcpy(backup_path, save_path, path_length + 12);
+    memcpy(backup_path + (path_length + 8), ".backup.tox", sizeof(".backup.tox"));
+
+    rename((char*)save_path, (char*)backup_path);
 }
 
 static void write_save(Tox *tox)
@@ -558,6 +568,11 @@ void tox_thread(void *UNUSED(args))
         if (save_size) {
             tox_after_load(tox);
             free(save_data);
+            // TODO More error checking!
+            if(!tox_self_get_name_size(tox)){
+                /* uTox doesn't support 0 length names */
+                load_defaults(tox);
+            }
         } else {
             debug("No save file, using defaults\n");
             load_defaults(tox);
