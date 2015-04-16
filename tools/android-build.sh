@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to cross compile utox for android from linux (and soon windows)
+# Script to cross compile utox for android from linux (and soon windows (maybe not...))
 #
 
 
@@ -40,21 +40,23 @@ export PATH="$TOOLCHAIN/bin:$PATH"
 SDK_PATH=/opt/android-sdk
 # cd utox
 
+cd src/
+
 mkdir ./tmp
 mkdir ./tmp/java
 mkdir ./tmp/libs
 mkdir ./tmp/libs/armeabi
 
-ls -la ../openal-arm/lib/
-OPENAL_BUILD='-I../openal-arm/include ../openal-arm/lib/libopenal.a -lOpenSLES'
+ls -la ../lib/openal-arm/lib/
+OPENAL_BUILD='-I../lib/openal-arm/include ../lib/openal-arm/lib/libopenal.a -lOpenSLES'
 NATIVE_AUDIO_BUILD='-DNATIVE_ANDROID_AUDIO -lOpenSLES'
 
 arm-linux-androideabi-gcc -Wl,--error-unresolved-symbols \
 		-Wall -Wextra -s \
-		-I../freetype-arm/include/freetype2/ -I../toxcore-arm/include/ \
+		-I../lib/freetype-arm/include/freetype2/ -I../lib/toxcore-arm/include/ \
 		./*.c ./png/png.c -llog -landroid -lEGL -lGLESv2 $OPENAL_BUILD \
-		../toxcore-arm/lib/libtoxcore.a ../toxcore-arm/lib/libtoxdns.a ../toxcore-arm/lib/libtoxav.a ../toxcore-arm/lib/libsodium.a \
-		../toxcore-arm/lib/libopus.a ../toxcore-arm/lib/libvpx.a ../freetype-arm/lib/libfreetype.a \
+		../lib/toxcore-arm/lib/libtoxcore.a ../lib/toxcore-arm/lib/libtoxdns.a ../lib/toxcore-arm/lib/libtoxav.a ../lib/toxcore-arm/lib/libsodium.a \
+		../lib/toxcore-arm/lib/libopus.a ../lib/toxcore-arm/lib/libvpx.a ../lib/freetype-arm/lib/libfreetype.a \
 		-lm -lz -ldl -shared -o ./tmp/libs/armeabi/libn.so
 
 $SDK_PATH/build-tools/21.1.2/aapt package -f -M ./android/AndroidManifest.xml -S ./android/res \
