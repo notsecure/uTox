@@ -201,7 +201,7 @@ void log_read(Tox *tox, int fid)
         time_t rawtime = header.time;
         ti = localtime(&rawtime);
 
-        msg->time = ti->tm_hour * 60 + ti->tm_min;
+        msg->time = ti->tm_hour * 3600 + ti->tm_min * 60 + ti->tm_sec;
 
         m->data[m->n++] = msg;
 
