@@ -237,12 +237,11 @@ GLYPH* font_getglyph(FONT *f, uint32_t ch)
         free(p->bitmap.buffer);
         p->bitmap.buffer = mybuf;
         no_subpixel = 1;
-    } else if (p->bitmap.pixel_mode == FT_PIXEL_MODE_GRAY) {
-        g->width = p->bitmap.width;
-        no_subpixel = 1;
     } else {
-        g->width = p->bitmap.width / 3;
-        no_subpixel = 0;
+        g->width = p->bitmap.width;
+        if (p->bitmap.pixel_mode != FT_PIXEL_MODE_GRAY) {
+            no_subpixel = 0;
+        }  
     }
 
     //debug("%u %u %u %u %C\n", PIXELS(i->face->size->metrics.height), g->width, g->height, p->bitmap.pitch, ch);
