@@ -563,9 +563,6 @@ void tox_thread(void *UNUSED(args))
             load_defaults(tox);
         }
 
-        // Load saved file transfers
-        utox_file_load_active();
-
         // Set local info for self
         edit_setstr(&edit_name, self.name, self.name_length);
         edit_setstr(&edit_status, self.statusmsg, self.statusmsg_length);
@@ -639,8 +636,6 @@ void tox_thread(void *UNUSED(args))
                 if (save_needed || (time - last_save >= (uint64_t)100 * 1000 * 1000 * 1000)){
                     // Save tox data
                     write_save(tox);
-                    // Save file transfer data
-                    utox_file_save_active();
                 }
             }
 
@@ -1102,6 +1097,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
             file_transfer_local_control(tox, param1, param2, TOX_FILE_CONTROL_CANCEL);
         }
         break;
+        free(data);
     }
 
     case TOX_FILE_INCOMING_RESUME:
@@ -1132,6 +1128,7 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         } else {
             ft_friend_online(tox, param1);
             /* resend avatar info (in case it changed) */
+            /* Avatars must be sent LAST or they will clobber existing file transfers! */
             avatar_on_friend_online(tox, param1);
         }
         break;
@@ -1625,7 +1622,6 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         }
 
         updatefriend(f);
-        // todo free
         free(file);
         break;
     }
