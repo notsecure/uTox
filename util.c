@@ -633,6 +633,7 @@ UTOX_SAVE* config_load(void)
     save->logging_enabled = 1;
     save->close_to_tray = 0;
     save->start_in_tray = 0;
+    save->show_tray_icon = 1;
     save->audible_notifications_enabled = 1;
     save->audio_filtering_enabled = 1;
     save->proxy_ip[0] = 0;
@@ -649,6 +650,7 @@ NEXT:
     dropdown_logging.selected = dropdown_logging.over = save->logging_enabled;
     dropdown_close_to_tray.selected = dropdown_close_to_tray.over = save->close_to_tray;
     dropdown_start_in_tray.selected = dropdown_start_in_tray.over = save->start_in_tray;
+    dropdown_show_tray_icon.selected = dropdown_show_tray_icon.over = save->show_tray_icon;
     dropdown_audible_notification.selected = dropdown_audible_notification.over = !save->audible_notifications_enabled;
     dropdown_audio_filtering.selected = dropdown_audio_filtering.over = !save->audio_filtering_enabled;
     dropdown_filter.selected = FILTER = save->filter;
@@ -671,6 +673,7 @@ NEXT:
     logging_enabled = save->logging_enabled;
     close_to_tray = save->close_to_tray;
     start_in_tray = save->start_in_tray;
+    show_tray_icon = save->show_tray_icon;
     audible_notifications_enabled = save->audible_notifications_enabled;
     audio_filtering_enabled = save->audio_filtering_enabled;
     loaded_audio_out_device = save->audio_device_out;
@@ -701,6 +704,7 @@ void config_save(UTOX_SAVE *save)
     save->logging_enabled = logging_enabled;
     save->close_to_tray = close_to_tray;
     save->start_in_tray = start_in_tray;
+    save->show_tray_icon = show_tray_icon;
     save->audible_notifications_enabled = audible_notifications_enabled;
     save->audio_filtering_enabled = audio_filtering_enabled;
 

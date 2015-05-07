@@ -85,6 +85,7 @@ HWND video_hwnd[MAX_NUM_FRIENDS];
 //static char save_path[280];
 
 static _Bool flashing, desktopgrab_video;
+static _Bool iconshown = 0;
 
 static TRACKMOUSEEVENT tme = {sizeof(TRACKMOUSEEVENT), TME_LEAVE, 0, 0};
 static _Bool mouse_tracked = 0;
@@ -991,7 +992,7 @@ int file_unlock(FILE *file, uint64_t start, size_t length){
  * returns void;
  */
 void notify(char_t *title, STRING_IDX title_length, char_t *msg, STRING_IDX msg_length, FRIEND *f){
-    if(havefocus) {
+    if(havefocus || !show_tray_icon) {
         return;
     }
 
@@ -1032,6 +1033,11 @@ void redraw(void)
 void update_tray(void){
     uint32_t tip_length;
     char *tip;
+
+    if (!show_tray_icon) {
+        return;
+    }
+
     tip = malloc(128 * sizeof(char)); //128 is the max length of nid.szTip
 
     snprintf(tip, 127*sizeof(char), "%s : %s", self.name, self.statusmsg);
@@ -1223,6 +1229,30 @@ void setscale(void)
     //font_msg_lineheight = tm.tmHeight + tm.tmExternalLeading;
 
     svg_draw(1);
+}
+
+void trayiconvisible(_Bool shown)
+{
+    NOTIFYICONDATA nid = {
+        .uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
+        .uCallbackMessage = WM_NOTIFYICON,
+        .hIcon = my_icon,
+        .szTip = "uTox default tooltip",
+        .cbSize = sizeof(nid),
+        .hWnd = hwnd,
+    };
+
+    if (shown) {
+        if (!iconshown) {
+            Shell_NotifyIcon(NIM_ADD, &nid);
+            iconshown = 1;
+        }
+    } else {
+        if (iconshown) {
+            Shell_NotifyIcon(NIM_DELETE, &nid);
+            iconshown = 0;
+        }
+    }
 }
 
 void config_osdefaults(UTOX_SAVE *r)
@@ -1423,7 +1453,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     tme.hwndTrack = hwnd;
 
     nid.hWnd = hwnd;
-    Shell_NotifyIcon(NIM_ADD, &nid);
+    if (show_tray_icon) {
+        Shell_NotifyIcon(NIM_ADD, &nid);
+        iconshown = 1;
+    }
 
     SetBkMode(hdc, TRANSPARENT);
 
@@ -1449,7 +1482,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     redraw();
     update_tray();
 
-    if(start_in_tray){
+    if(show_tray_icon && start_in_tray){
         ShowWindow(hwnd, SW_HIDE);
         hidden = 1;
     } else {
@@ -1471,6 +1504,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
 
     /* delete tray icon */
     Shell_NotifyIcon(NIM_DELETE, &nid);
+    iconshown = 0;
 
     /* wait for threads to exit */
     while(tox_thread_init) {
@@ -1531,7 +1565,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_QUIT:
     case WM_CLOSE:
     case WM_DESTROY: {
-        if(close_to_tray){
+        if(show_tray_icon && close_to_tray){
             debug("Closing to tray.\n");
             togglehide();
             return 1;
@@ -1603,15 +1637,16 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         if(flashing) {
             FlashWindow(hwnd, 0);
             flashing = 0;
-
-            NOTIFYICONDATAW nid = {
+            if (show_tray_icon) {
+                NOTIFYICONDATAW nid = {
                     .uFlags = NIF_ICON,
                     .hWnd = hwnd,
                     .hIcon = my_icon,
                     .cbSize = sizeof(nid),
-            };
+                };
 
-            Shell_NotifyIconW(NIM_MODIFY, &nid);
+                Shell_NotifyIconW(NIM_MODIFY, &nid);
+            }
         }
 
         havefocus = 1;

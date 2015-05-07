@@ -118,6 +118,12 @@ static void dropdown_start_in_tray_onselect(uint16_t i, const DROPDOWN* UNUSED(d
     debug("Start in Tray.   :: %i\n", start_in_tray);
 }
 
+static void dropdown_show_tray_icon_onselect(uint16_t i, const DROPDOWN* UNUSED(dm)){
+    show_tray_icon = i;
+    debug("Show Tray Icon.   :: %i\n", show_tray_icon);
+    trayiconvisible(show_tray_icon);
+}
+
 static UI_STRING_ID dpidrops[] = {
     STR_DPI_TINY,
     STR_DPI_NORMAL,
@@ -232,6 +238,13 @@ dropdown_close_to_tray = {
 dropdown_start_in_tray = {
     .ondisplay = simple_dropdown_ondisplay,
     .onselect = dropdown_start_in_tray_onselect,
+    .dropcount = countof(noyesdrops),
+    .userdata = noyesdrops
+},
+
+dropdown_show_tray_icon = {
+    .ondisplay = simple_dropdown_ondisplay,
+    .onselect = dropdown_show_tray_icon_onselect,
     .dropcount = countof(noyesdrops),
     .userdata = noyesdrops
 },
