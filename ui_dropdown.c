@@ -111,17 +111,34 @@ static void dropdown_audio_filtering_onselect(uint16_t i, const DROPDOWN* UNUSED
 static void dropdown_close_to_tray_onselect(uint16_t i, const DROPDOWN* UNUSED(dm)){
     close_to_tray = i;
     debug("Close To Tray.   :: %i\n", close_to_tray);
+
+    if (close_to_tray) {
+        dropdown_show_tray_icon.selected = 1;
+        dropdown_show_tray_icon.onselect(1, &dropdown_show_tray_icon);
+    }
 }
 
 static void dropdown_start_in_tray_onselect(uint16_t i, const DROPDOWN* UNUSED(dm)){
     start_in_tray = i;
     debug("Start in Tray.   :: %i\n", start_in_tray);
+
+    if (start_in_tray) {
+        dropdown_show_tray_icon.selected = 1;
+        dropdown_show_tray_icon.onselect(1, &dropdown_show_tray_icon);
+    }
 }
 
 static void dropdown_show_tray_icon_onselect(uint16_t i, const DROPDOWN* UNUSED(dm)){
     show_tray_icon = i;
     debug("Show Tray Icon.   :: %i\n", show_tray_icon);
     trayiconvisible(show_tray_icon);
+
+    if (!show_tray_icon) {
+        dropdown_close_to_tray.selected = 0;
+        dropdown_close_to_tray.onselect(0, &dropdown_close_to_tray);
+        dropdown_start_in_tray.selected = 0;
+        dropdown_start_in_tray.onselect(0, &dropdown_start_in_tray);
+    }
 }
 
 static UI_STRING_ID dpidrops[] = {
