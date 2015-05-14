@@ -471,7 +471,7 @@ void setselection(char_t *data, STRING_IDX length)
 #define SYSTEM_TRAY_CANCEL_MESSAGE  2
 
 _Bool hidden = 0;
-Window tray_window;
+Window tray_window = 0;
 
 void send_message(
      Display* dpy, /* display */
@@ -500,14 +500,19 @@ void send_message(
 
 void create_tray_icon(void)
 {
-    tray_window = XCreateSimpleWindow(display, RootWindow(display, screen), 0, 0, 255, 255, 0, BlackPixel(display, screen), WhitePixel(display, screen));
-    XSelectInput(display, tray_window, ButtonPress);
-    send_message(display, XGetSelectionOwner(display, XInternAtom(display, "_NET_SYSTEM_TRAY_S0", False)), SYSTEM_TRAY_REQUEST_DOCK, tray_window, 0, 0);
+    if (!tray_window) {
+        tray_window = XCreateSimpleWindow(display, RootWindow(display, screen), 0, 0, 255, 255, 0, BlackPixel(display, screen), WhitePixel(display, screen));
+        XSelectInput(display, tray_window, ButtonPress);
+        send_message(display, XGetSelectionOwner(display, XInternAtom(display, "_NET_SYSTEM_TRAY_S0", False)), SYSTEM_TRAY_REQUEST_DOCK, tray_window, 0, 0);
+    }
 }
 
 void destroy_tray_icon(void)
 {
-    XDestroyWindow(display, tray_window);
+    if (tray_window) {
+        XDestroyWindow(display, tray_window);
+        tray_window = 0;
+    }
 }
 
 /** Toggles the main window to/from hidden to tray/shown. */
@@ -868,6 +873,15 @@ void setscale(void)
     }
 }
 
+void trayiconvisible(_Bool shown)
+{
+    if (shown) {
+        create_tray_icon();
+    } else {
+        destroy_tray_icon();
+    }
+}
+
 int file_lock(FILE *file, uint64_t start, size_t length){
     int result = -1;
     struct flock fl;
@@ -958,6 +972,9 @@ void force_redraw(void) {
 
 void update_tray(void)
 {
+    if (!show_tray_icon) {
+        return;
+    }
 }
 
 #include "event.c"
@@ -1196,7 +1213,7 @@ int main(int argc, char *argv[])
     dropdown_language.selected = dropdown_language.over = LANG;
 
     /* make the window visible */
-    if (start_in_tray) {
+    if (show_tray_icon && start_in_tray) {
         togglehide();
     } else {
         XMapWindow(display, window);
@@ -1222,7 +1239,10 @@ int main(int argc, char *argv[])
         yieldcpu(1);
     }
 
-    create_tray_icon();
+    if (show_tray_icon) {
+        create_tray_icon();
+    }
+
     /* Registers the app in the Unity MM */
     #ifdef UNITY
     unity_running = is_unity_running();

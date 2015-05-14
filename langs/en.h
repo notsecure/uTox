@@ -166,6 +166,9 @@ msgstr("Close To Tray")
 msgid(START_IN_TRAY)
 msgstr("Start In Tray")
 
+msgid(SHOW_TRAY_ICON)
+msgstr("Show Tray Icon")
+
 msgid(COPY)
 msgstr("Copy")
 
