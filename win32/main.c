@@ -1,8 +1,3 @@
-#ifdef _WIN32_WINNT
-#undef _WIN32_WINNT
-#endif
-#define _WIN32_WINNT 0x500
-
 #ifndef WINVER
 #define WINVER 0x410
 #endif
@@ -42,12 +37,6 @@ extern const CLSID CLSID_NullRenderer;
 
 #include <io.h>
 #include <error.h>
-
-/* mingw64 doesn't provide this def, but it should exist... */
-errno_t _chsize_s(
-   int fd,
-   __int64 size
-);
 
 #undef CLEARTYPE_QUALITY
 #define CLEARTYPE_QUALITY 5
@@ -611,8 +600,8 @@ void ShowContextMenu(void)
 
         InsertMenu(hMenu, -1, MF_BYPOSITION, TRAY_EXIT, "Exit");
 
-        // note:	must set window to the foreground or the
-        //			menu won't disappear when it should
+        // note:    must set window to the foreground or the
+        //          menu won't disappear when it should
         SetForegroundWindow(hwnd);
 
         TrackPopupMenu(hMenu, TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd, NULL);
@@ -1250,10 +1239,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     if (!utox_mutex) {
         return 0;
     }
-
     if(GetLastError() == ERROR_ALREADY_EXISTS) {
         HWND window = FindWindow(TITLE, NULL);
-
         if (window) {
             SetForegroundWindow(window);
             if (*cmd) {
@@ -1264,7 +1251,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
                 SendMessage(window, WM_COPYDATA, (WPARAM)hInstance, (LPARAM)&data);
             }
         }
-
         return 0;
     }
 
@@ -1312,12 +1298,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
                         theme = THEME_DEFAULT;
                     }
                 }
+            /* Set flags */
+            } else if(wcsncmp(arglist[i], L"--set", 5) == 0){
+                // debug("Set flag on\n");
+                if(wcsncmp(arglist[i], L"--set=", 6) == 0){
+                    if(wcscmp(arglist[i]+6, L"start-on-boot") == 0)
+                        launch_at_startup(1);
+                } else {
+                    if(arglist[i+1]){
+                        if(wcscmp(arglist[i+1], L"start-on-boot") == 0)
+                            launch_at_startup(1);
+                    }
+                }
+            /* Unset flags */
+            } else if(wcsncmp(arglist[i], L"--unset", 7) == 0){
+                // debug("Unset flag on\n");
+                if(wcsncmp(arglist[i], L"--unset=", 8) == 0){
+                    if(wcscmp(arglist[i]+8, L"start-on-boot") == 0)
+                        // debug("unset start\n");
+                        launch_at_startup(0);
+                } else {
+                    if(arglist[i+1]){
+                        if(wcscmp(arglist[i+1], L"start-on-boot") == 0)
+                            // debug("unset start\n");
+                            launch_at_startup(0);
+                    }
+                }
             } else if(wcscmp(arglist[i], L"--no-updater") == 0){
                 no_updater = 1;
             }
         }
     }
-
 #ifdef UPDATER_BUILD
 #define UTOX_EXE "\\uTox.exe"
 #define UTOX_UPDATER_EXE "\\utox_runner.exe"
@@ -1488,7 +1499,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     };
     config_save(&d);
 
-    printf("uTox Clean Exit	::\n");
+    printf("uTox Clean Exit    ::\n");
 
     return 0;
 }
@@ -2515,4 +2526,34 @@ _Bool video_endread(void)
         return 0;
     }
     return 1;
+}
+
+void launch_at_startup(int is_launch_at_startup){
+    HKEY hKey;
+    const wchar_t* run_key_path = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    wchar_t path[UTOX_FILE_NAME_LENGTH*2];
+    uint16_t path_length = 0, ret = 0;
+    if(is_launch_at_startup == 1){
+        if(ERROR_SUCCESS == RegOpenKeyW(HKEY_CURRENT_USER, run_key_path, &hKey)){
+            path_length = GetModuleFileNameW(NULL, path+1, UTOX_FILE_NAME_LENGTH*2);
+            path[0] = '\"';
+            path[path_length+1] = '\"';
+            path[path_length+2] = '\0';
+            path_length += 2;
+            ret = RegSetKeyValueW(hKey, NULL, L"uTox", REG_SZ, path, path_length*2); /*2 bytes per wchar */
+            if(ret == ERROR_SUCCESS){
+                debug("Successful auto start addition.\n");
+            }
+            RegCloseKey(hKey);
+        }
+    }
+    if(is_launch_at_startup == 0){
+        if(ERROR_SUCCESS == RegOpenKeyW(HKEY_CURRENT_USER, run_key_path, &hKey)){
+            ret = RegDeleteKeyValueW(hKey, NULL, L"uTox");
+            if(ret == ERROR_SUCCESS){
+                debug("Successful auto start deletion.\n");
+            }
+            RegCloseKey(hKey);
+        }
+    }
 }
