@@ -66,6 +66,7 @@ void friend_recvimage(FRIEND *f, UTOX_NATIVE_IMAGE *native_image, uint16_t width
     msg->position = 0.0;
 
     message_add(&messages_friend, (void*)msg, &f->msg);
+    postmessage(REDRAW, 0, 0, NULL);
 }
 
 void friend_notify(FRIEND *f, char_t *str, STRING_IDX str_length, char_t *msg, STRING_IDX msg_length)
