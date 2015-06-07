@@ -82,9 +82,9 @@ void messages_draw(MESSAGES *m, int x, int y, int width, int height)
 
         // Draw timestamps
         {
-            char timestr[6];
+            char timestr[9];
             STRING_IDX len;
-            len = snprintf(timestr, sizeof(timestr), "%u:%.2u", msg->time / 60, msg->time % 60);
+            len = snprintf(timestr, sizeof(timestr), "%u:%.2u:%.2u", msg->time / 3600, (msg->time / 60) % 60, msg->time % 60);
             if (len >= sizeof(timestr)) {
                 len = sizeof(timestr) - 1;
             }
@@ -985,7 +985,7 @@ void message_add(MESSAGES *m, MESSAGE *msg, MSG_DATA *p)
     ti = localtime(&rawtime);
 
     // Set the time this message was recived by utox
-    msg->time = ti->tm_hour * 60 + ti->tm_min;
+    msg->time = ti->tm_hour * 3600 + ti->tm_min * 60 + ti->tm_sec;
 
     if(p->n < MAX_BACKLOG_MESSAGES) {
         p->data = realloc(p->data, (p->n + 1) * sizeof(void*));

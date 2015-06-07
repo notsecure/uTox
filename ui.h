@@ -149,7 +149,7 @@ uint8_t SCALE;
 
 #define MESSAGES_SPACING (SCALE * 2)
 #define MESSAGES_X (55 * SCALE)
-#define TIME_WIDTH (16 * SCALE)
+#define TIME_WIDTH (24 * SCALE)
 #define NAME_OFFSET (7 * SCALE)
 
 #define MESSAGES_BOTTOM (-47 * SCALE)
