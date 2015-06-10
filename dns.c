@@ -1,7 +1,7 @@
 #include "main.h"
 #include <tox/toxdns.h>
 
-static struct tox3
+static struct toxdns3
 {
     uint8_t *name;
     void *dns3;
@@ -22,8 +22,8 @@ static struct tox3
 static void* istox3(uint8_t *name, uint16_t name_length)
 {
     int i;
-    for(i = 0; i != countof(tox3_server); i++) {
-        struct tox3 *t = &tox3_server[i];
+    for(i = 0; i != countof(toxdns3_server); i++) {
+        struct toxdns3 *t = &toxdns3_server[i];
         if(memcmp(name, t->name, name_length) == 0 && t->name[name_length] == 0) {
             //what if two threads reach this point at the same time?->initialize all dns3 at start instead
             if(!t->dns3) {
@@ -106,7 +106,7 @@ static int64_t parseargument(uint8_t *dest, char_t *src, uint16_t length, void *
 
         case '@': {
             void *dns3;
-            if((dns3 = istox3(a + 1, b - (a + 1)))) {
+            if((dns3 = istoxdns3(a + 1, b - (a + 1)))) {
                 uint8_t out[256];
                 int len = tox_generate_dns3_string(dns3, out, sizeof(out), &pin, dest, d - dest);
                 if(len != -1) {
@@ -137,7 +137,7 @@ static int64_t parseargument(uint8_t *dest, char_t *src, uint16_t length, void *
         if ((d - dest) > TOXDNS_MAX_RECOMMENDED_NAME_LENGTH)
             return -1;
 
-        void *dns3 = istox3((uint8_t *)"utox.org", sizeof("utox.org") - 1);
+        void *dns3 = istoxdns3((uint8_t *)"utox.org", sizeof("utox.org") - 1);
 
         if (!dns3)
             return -1;
@@ -255,10 +255,10 @@ static _Bool parserecord(uint8_t *dest, uint8_t *src, uint32_t pin, void *dns3)
             a += 3;
         }
 
-        if(!version && memcmp("v=tox", a, 5) == 0) {
-            if(a[5] >= '1' && a[5] <= '3') {
-                version = a[5] - '0';
-                a += 5;
+        if(!version && memcmp("v=toxdns", a, 8) == 0) {
+            if(a[8] >= '1' && a[8] <= '3') {
+                version = a[8] - '0';
+                a += 8;
             }
         }
 
@@ -366,7 +366,7 @@ static void dns_thread(void *data)
 
     debug("%s reponded %u\n", value, len);
 
-    p = memmem(packet, len, "v=tox", 5);
+    p = memmem(packet, len, "v=toxdns", 8);
     if(p) {
         debug("test %u\n", *(p - 1));
         p[*(p - 1)] = 0;
