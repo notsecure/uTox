@@ -331,37 +331,37 @@ static size_t load_save(uint8_t **out_data){
     uint32_t size;
     const unsigned int tox_savename_len = strlen(tox_savename);
 
-    /* Try the STS compliant save location */
-    p = path + datapath(path);
-    memcpy(savename, tox_savename, tox_savename_len);
-    memcpy(savename+tox_savename_len, ".tox", sizeof(".tox")); /* Add tox extension */
-    memcpy((char*)p, savename, tox_savename_len+sizeof(".tox"));
-    data = file_raw((char*)path, &size);
-    if(data) break; /* We have data, were done here! */
-    /* Try filename missing the .tox extension */
-    p = path + datapath(path);
-    memcpy((char*)p, tox_savename, tox_savename_len+1);
-    data = file_raw((char*)path, &size);
-    if(data) break;
-    /* That didn't work, do we have a backup?
-     * search for the atomic same file name incase we crashed while writing
-     * the save file to disk. */
-    p = path + datapath(path);
-    memcpy(savename+tox_savename_len, ".tmp", sizeof(".tmp"));
-    memcpy((char*)p, savename, tox_savename_len+sizeof(".tmp"));
-    data = file_raw((char*)path, &size);
-    if(data) break;
-    /* No backup huh? Is it in an old location we support?
-     * These next 3 are for legacy support, ideally no one still uses this
-     * location, but let's just be sure. */
-    p = path + datapath_old(path);
-    strcpy((char*)p, "tox_save");
-    data = file_raw((char*)path, &size);
-    if(data) break;
-    /* Well, lets try the current directory... */
-    data = file_raw(tox_savename, &size);
-    if(!data) return 0; /* F***it I give up! */
-
+    do { /* Try the STS compliant save location */
+        p = path + datapath(path);
+        memcpy(savename, tox_savename, tox_savename_len);
+        memcpy(savename+tox_savename_len, ".tox", sizeof(".tox")); /* Add tox extension */
+        memcpy((char*)p, savename, tox_savename_len+sizeof(".tox"));
+        data = file_raw((char*)path, &size);
+        if(data) break; /* We have data, were done here! */
+        /* Try filename missing the .tox extension */
+        p = path + datapath(path);
+        memcpy((char*)p, tox_savename, tox_savename_len+1);
+        data = file_raw((char*)path, &size);
+        if(data) break;
+        /* That didn't work, do we have a backup?
+         * search for the atomic same file name incase we crashed while writing
+         * the save file to disk. */
+        p = path + datapath(path);
+        memcpy(savename+tox_savename_len, ".tmp", sizeof(".tmp"));
+        memcpy((char*)p, savename, tox_savename_len+sizeof(".tmp"));
+        data = file_raw((char*)path, &size);
+        if(data) break;
+        /* No backup huh? Is it in an old location we support?
+         * These next 3 are for legacy support, ideally no one still uses this
+         * location, but let's just be sure. */
+        p = path + datapath_old(path);
+        strcpy((char*)p, "tox_save");
+        data = file_raw((char*)path, &size);
+        if(data) break;
+        /* Well, lets try the current directory... */
+        data = file_raw(tox_savename, &size);
+        if(!data) return 0; /* F***it I give up! */
+    } while (0);
     *out_data = data;
     return size;
 }
