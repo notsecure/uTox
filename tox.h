@@ -73,11 +73,17 @@ enum
 
 enum
 {
+    // kill the video thread
     VIDEO_KILL,
+    // set a new video device
     VIDEO_SET,
+    // start a video preview
     VIDEO_PREVIEW_START,
+    // end a video preview
     VIDEO_PREVIEW_END,
+    // start a video call
     VIDEO_CALL_START,
+    // end a video call
     VIDEO_CALL_END,
 };
 
