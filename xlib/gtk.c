@@ -1,13 +1,13 @@
 #ifdef __APPLE__
-#define LIBGTK_FILENAME "libgtk-x11-2.0.dylib"
+#define LIBGTK_FILENAME "libgtk-3.dylib"
 #else
-#define LIBGTK_FILENAME "libgtk-x11-2.0.so.0"
+#define LIBGTK_FILENAME "libgtk-3.so.0"
 #endif
 
 typedef struct
 {
     void *data, *next;
-}g_list;
+}g_slist;
 
 void (*gtk_init)(int*, char***);
 _Bool (*gtk_events_pending)(void);
@@ -24,6 +24,7 @@ void* (*gtk_file_chooser_set_do_overwrite_confirmation)(const char*, void*);
 void (*gtk_file_chooser_set_filter)(void*, void*);
 void (*gtk_file_filter_add_mime_type)(void*, const char*);
 void (*gtk_widget_destroy)(void*);
+void (*g_slist_free_utox)(void*);
 void (*g_free_utox)(void*); // this can't be called g_free because it causes segvaults on some machines if it is
 
 volatile _Bool gtk_open;
@@ -32,20 +33,20 @@ static void gtk_opensendthread(void *args)
 {
     uint16_t fid = (size_t)args;
 
-    void *dialog = gtk_file_chooser_dialog_new(S(SEND_FILE), NULL, 0, "gtk-cancel", -6, "gtk-open", -3, NULL);
+    void *dialog = gtk_file_chooser_dialog_new(S(SEND_FILE), NULL, 0, NULL);
     gtk_file_chooser_set_select_multiple(dialog, 1);
     int result = gtk_dialog_run(dialog);
     if(result == -3) {
         char *out = malloc(65536), *outp = out;
-        g_list *list = gtk_file_chooser_get_filenames(dialog), *p = list;
+        g_slist *list = gtk_file_chooser_get_filenames(dialog), *p = list;
         while(p) {
             outp = stpcpy(outp, p->data);
             *outp++ = '\n';
-            //g_free(p->data)
+            g_free_utox(p->data);
             p = p->next;
         }
         *outp = 0;
-        //g_slist_free(list)
+        g_slist_free_utox(list);
         debug("files: %s\n", out);
 
         //dont call this from this thread
@@ -257,6 +258,7 @@ void* gtk_load(void)
         gtk_file_chooser_set_filter = dlsym(lib, "gtk_file_chooser_set_filter");
         gtk_file_filter_add_mime_type = dlsym(lib, "gtk_file_filter_add_mime_type");
         gtk_widget_destroy = dlsym(lib, "gtk_widget_destroy");
+        g_slist_free_utox = dlsym(lib, "g_slist_free");
         g_free_utox = dlsym(lib, "g_free");
 
         if(!gtk_init || !gtk_main_iteration || !gtk_events_pending || !gtk_file_chooser_dialog_new || !gtk_file_filter_new ||
@@ -269,6 +271,8 @@ void* gtk_load(void)
             gtk_init(NULL, NULL);
             return lib;
         }
+    } else {
+       debug("no GTK\n");
     }
     return NULL;
 }
