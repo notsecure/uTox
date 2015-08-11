@@ -71,14 +71,14 @@ static void drawtextmark(int x, int y, char_t *str, STRING_IDX length, int d, in
 int drawtextmultiline(int x, int right, int y, int top, int bottom, uint16_t lineheight, char_t *data, STRING_IDX length, STRING_IDX h, STRING_IDX hlen, STRING_IDX mark, STRING_IDX marklen, _Bool multiline)
 {
     uint32_t c1, c2;
-    _Bool greentext = 0, link = 0, draw = y + lineheight >= top;
+    _Bool colourtext = 0, link = 0, draw = y + lineheight >= top;
     int xc = x;
     char_t *a = data, *b = a, *end = a + length;
     while(1) {
         if(a != end) {
             if(*a == '>' && (a == data || *(a - 1) == '\n'))  {
                 c1 = setcolor(COLOR_MAIN_QUOTETEXT);
-                greentext = 1;
+                colourtext = 1;
             }
 
             if((a == data || *(a - 1) == '\n' || *(a - 1) == ' ') && ((end - a >= 7 && memcmp(a, "http://", 7) == 0) || (end - a >= 8 && memcmp(a, "https://", 8) == 0))) {
@@ -93,7 +93,7 @@ int drawtextmultiline(int x, int right, int y, int top, int bottom, uint16_t lin
                 }
                 if (*(r - 1) == '<') {
                     c1 = setcolor(COLOR_MAIN_REDTEXT);
-                    greentext = 1;
+                    colourtext = 1;
                 }
             }
         }
@@ -143,17 +143,17 @@ int drawtextmultiline(int x, int right, int y, int top, int bottom, uint16_t lin
             }
 
             if(a == end) {
-                if(greentext) {
+                if(colourtext) {
                     setcolor(c1);
-                    greentext = 0;
+                    colourtext = 0;
                 }
                 break;
             }
 
             if(*a == '\n') {
-                if(greentext) {
+                if(colourtext) {
                     setcolor(c1);
-                    greentext = 0;
+                    colourtext = 0;
                 }
                 y += lineheight;
                 draw = (y + lineheight >= top && y < bottom);
