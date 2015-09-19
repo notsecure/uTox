@@ -146,7 +146,7 @@ msgid(UI)
 msgstr("UI")
 
 msgid(USER_INTERFACE)
-msgstr("Interfaccia Utente")
+msgstr("Interfaccia")
 
 msgid(UTOX_SETTINGS)
 msgstr("Impostazioni uTox")
