@@ -668,8 +668,11 @@ void tox_thread(void *UNUSED(args))
 
         // Start the treads
         thread(audio_thread, av);
+        while(!audio_thread_init) yieldcpu(1);
         thread(video_thread, av);
+        while(!video_thread_init) yieldcpu(1);
         thread(toxav_thread, av);
+        while(!toxav_thread_init) yieldcpu(1);
 
         //
         _Bool connected = 0;
