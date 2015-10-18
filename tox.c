@@ -902,7 +902,6 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
     
 	 case TOX_FRIEND_RECEIPT: {
 	 
-	 		debug ("TOX_FRIEND_RECEIPT\n");
 	 		not_acked_message_receipt_cb(param1, param2);
 	 		break;
 	 }
@@ -1286,7 +1285,6 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
     
 	case FRIEND_RECEIPT: {
 	
-		debug ("tox_message FRIEND_RECEITP\n");
 		tox_postmessage (TOX_FRIEND_RECEIPT, param1, param2, 0);
 		break;
 	
@@ -1963,6 +1961,7 @@ for (c=0; c<n_not_acked_messages; c++) {
 	if (not_acked_messages[c]->time != 0) {
 		not_acked_messages_swp[c2] = not_acked_messages[c];
 		c2 += 1;	}
+	if (not_acked_messages[c]->time == 0) free (not_acked_messages[c]);
 		}
 		
 n_not_acked_messages = c2;
