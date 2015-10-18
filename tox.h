@@ -47,6 +47,7 @@ enum {
     TOX_FILE_OUTGOING_PAUSE,
     TOX_FILE_OUTGOING_CANCEL,
     TOX_FRIEND_ONLINE,
+    TOX_FRIEND_RECEIPT,
 };
 
 struct TOX_SEND_INLINE_MSG {
@@ -118,6 +119,8 @@ enum {
     FRIEND_STATUS,
     FRIEND_TYPING,
     FRIEND_ONLINE,
+    FRIEND_RECEIPT,
+
 
     /* friend a/v */
     FRIEND_CALL_STATUS,
@@ -184,3 +187,27 @@ void toxav_postmessage(uint8_t msg, uint32_t param1, uint32_t param2, void *data
 void tox_message(uint8_t msg, uint16_t param1, uint16_t param2, void *data);
 
 void tox_settingschanged(void);
+
+//-----------------------------------------------
+
+
+typedef struct not_acked_message_t {
+
+	uint32_t msg_id;
+	uint32_t friend_id;
+	uint32_t time;
+	
+}  not_acked_message_t;
+
+#define MAX_PENDING_MESSAGES 64
+#define MSG_RECEIPT_TIMEOUT 1000 //miliseconds
+
+not_acked_message_t** not_acked_messages;
+not_acked_message_t** not_acked_messages_swp;
+
+uint32_t n_not_acked_messages;
+
+void add_not_acked_message (uint32_t fid, uint32_t mid);
+void not_acked_message_receipt_cb (uint32_t fid, uint32_t mid);
+void not_acked_messages_timer();
+

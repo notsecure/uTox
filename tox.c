@@ -1,6 +1,8 @@
 #include "main.h"
 #include "tox_bootstrap.h"
 
+
+
 struct Tox_Options options = {.proxy_host = proxy_address};
 
 typedef struct {
@@ -444,6 +446,13 @@ static void tox_after_load(Tox *tox)
     self.statusmsg = malloc(self.statusmsg_length);
     tox_self_get_status_message(tox, self.statusmsg);
     self.status = tox_self_get_status(tox);
+    
+	n_not_acked_messages = 0;
+	not_acked_messages = (not_acked_message_t**) malloc (sizeof(void*)*MAX_PENDING_MESSAGES);
+	not_acked_messages_swp = (not_acked_message_t**) malloc (sizeof(void*)*MAX_PENDING_MESSAGES);
+	
+    
+    
 }
 
 static void load_defaults(Tox *tox)
@@ -670,6 +679,8 @@ void tox_thread(void *UNUSED(args))
         //
         _Bool connected = 0;
         uint64_t last_save = get_time(), time;
+		  uint64_t not_acked_messages_time = get_time();        
+        
         while(1) {
             // Put toxcore to work
             tox_iterate(tox);
@@ -697,6 +708,14 @@ void tox_thread(void *UNUSED(args))
                     write_save(tox);
                 }
             }
+
+
+				// check every 100ms if a not_acknowledged message times out 
+				//	that is, message takes longer than MSG_RECEIPT_TIMEOUT ms to be acked
+				if (time - not_acked_messages_time > (uint64_t)1 * 100 * 1000 * 1000) {
+						not_acked_messages_time = time;
+						not_acked_messages_timer();
+				}
 
             // If there's a message, load it, and send to the tox message thread
             if (tox_thread_msg) {
@@ -871,7 +890,8 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
             p += len;
         }
         // Send last or only message
-        tox_friend_send_message(tox, param1, type, p, param2, 0);
+        uint32_t t_mid = tox_friend_send_message(tox, param1, type, p, param2, 0);
+        add_not_acked_message (param1, t_mid);
 
         /* write message to friend to logfile */
         log_write(tox, param1, data, param2, 1, LOG_FILE_MSG_TYPE_TEXT);
@@ -879,6 +899,14 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         free(data);
         break;
     }
+    
+	 case TOX_FRIEND_RECEIPT: {
+	 
+	 		debug ("TOX_FRIEND_RECEIPT\n");
+	 		not_acked_message_receipt_cb(param1, param2);
+	 		break;
+	 }
+    
 
     case TOX_SENDMESSAGEGROUP: {
         /* param1: group #
@@ -1254,6 +1282,17 @@ static void call_notify(FRIEND *f, uint8_t status)
 void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void *data)
 {
     switch(tox_message_id) {
+    
+    
+	case FRIEND_RECEIPT: {
+	
+		debug ("tox_message FRIEND_RECEITP\n");
+		tox_postmessage (TOX_FRIEND_RECEIPT, param1, param2, 0);
+		break;
+	
+	}    
+    
+    
     case DHT_CONNECTED: {
         /* param1: connection status (1 = connected, 0 = disconnected)
          */
@@ -1859,4 +1898,92 @@ void tox_message(uint8_t tox_message_id, uint16_t param1, uint16_t param2, void 
         break;
     }
     }
+}
+
+//--------------------------------------------
+//--------------------------------------------
+
+void add_not_acked_message (uint32_t fid, uint32_t mid) {
+
+	if (n_not_acked_messages == MAX_PENDING_MESSAGES) return;
+	
+	not_acked_message_t* t = (not_acked_message_t*)malloc (sizeof (not_acked_message_t));
+	t->friend_id = fid;
+	t->msg_id = mid;
+	t->time = (get_time ())/ (1000*1000) ;
+	debug ("msg time %u\n", t->time);
+	not_acked_messages[n_not_acked_messages] = t;
+	n_not_acked_messages += 1;
+
+}
+
+//--------------------------------------------
+
+void not_acked_message_receipt_cb (uint32_t fid, uint32_t mid) {
+
+	int c;
+	int i = -1;
+	
+	for (c=0; c<n_not_acked_messages; c++)
+		if (not_acked_messages[c]->friend_id==fid && not_acked_messages[c]->msg_id==mid) i = c;
+	if (i == -1) return;
+	
+	debug ("message %i from friend %i has been acked - removing from list\n", mid, fid);
+	free (not_acked_messages[i]);
+	for (c=i; c<n_not_acked_messages; c++)
+		not_acked_messages[c] = not_acked_messages[c+1];
+	n_not_acked_messages -= 1;
+	
+
+}
+//--------------------------------------------
+
+void not_acked_messages_timer () {
+
+int c;
+uint32_t time = (get_time ())/ (1000*1000) ;
+uint32_t d; //elapsed time
+
+int n_rm = 0; //n. of messages that have timed out
+
+for (c=0; c<n_not_acked_messages; c++) {
+
+	d = time - not_acked_messages[c]->time;
+	//debug ("%i %u\n", c, d);
+		if (d > MSG_RECEIPT_TIMEOUT) {
+			not_acked_messages[c]->time = 0; //mark for deletion
+			friend_addmessage_2 (not_acked_messages[c]->friend_id, "NOTICE : failed to send message");
+			n_rm += 1;}
+		}
+
+if (n_rm ==0 )return;
+
+int c2 = 0;
+for (c=0; c<n_not_acked_messages; c++) {
+	if (not_acked_messages[c]->time != 0) {
+		not_acked_messages_swp[c2] = not_acked_messages[c];
+		c2 += 1;	}
+		}
+		
+n_not_acked_messages = c2;
+not_acked_message_t** t = not_acked_messages;
+not_acked_messages = not_acked_messages_swp;
+not_acked_messages_swp = t;
+
+
+}
+
+
+void friend_addmessage_2  (int fid, char* txt) {
+
+FRIEND* f = &friend[fid];
+int l = strlen (txt);
+MESSAGE* m = (MESSAGE*) malloc (sizeof(MESSAGE)+l+4);
+m->author = 0;
+m->msg_type = MSG_TYPE_ACTION_TEXT;
+m->length = l;
+memcpy (m->msg,txt, l);
+friend_addmessage (f, m);
+
+
 }
