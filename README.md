@@ -1,3 +1,8 @@
+# This repository is no longer maintained!
+# Please report issues or create pull requests here: https://github.com/GrayHatter/utox
+
+
+
 # μTox
 
 Lightweight [Tox](https://github.com/irungentoo/ProjectTox-Core) client.
