@@ -91,6 +91,8 @@ static void button_videopreview_onpress(void)
         video_begin(0, s->str, s->length, video_width, video_height);
         toxvideo_postmessage(VIDEO_PREVIEW_START, 0, 0, NULL);
         video_preview = 1;
+    } else {
+        debug("unable to start video preview. No info about frame size.\n");
     }
 }
 

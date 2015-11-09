@@ -130,18 +130,27 @@ static void video_thread(void *args)
 {
     ToxAv *av = args;
 
+    // holds the currently selected video device
     void *video_device;
+    // true if the video device was successfully opened
     _Bool video = 0;
+    // counts the number of calls/previews currently open
     uint8_t video_count = 0;
+    // indicates whether video is currently active (frames are to be read from camera)
     _Bool video_on = 0;
     _Bool call[MAX_CALLS] = {0}, preview = 0, newinput = 1;
 
     // Add always-present null video input device.
     postmessage(NEW_VIDEO_DEVICE, STR_VIDEO_IN_NONE, 1, NULL);
 
+    // select a video device (autodectect)
     video_device = video_detect();
-    if(video_device) {
-        video = openvideodevice(video_device);
+    if (video_device) {
+        // open the video device to get some info e.g. frame size
+        // close it afterwards to not block the device while it is not used
+        if (openvideodevice(video_device)) {
+            closevideodevice(video_device);
+        }
     }
 
     video_thread_init = 1;
@@ -154,15 +163,19 @@ static void video_thread(void *args)
             }
 
             switch(m->msg) {
+            // VIDEO_SET: select a different video device
             case VIDEO_SET: {
+                // end capturing if enabled
                 if(video_on) {
                     video_endread();
                 }
 
+                // close the currently active video device if any
                 if(video) {
                     closevideodevice(video_device);
                 }
 
+                // select the new device
                 video_device = m->data;
                 if(video_device == NULL) {
                     video = 0;
@@ -174,12 +187,21 @@ static void video_thread(void *args)
                     }
                 }
 
-                video = openvideodevice(video_device);
-                if(video) {
-                    if(video_count) {
+                // directly open new device if any calls or previews are currently active
+                if(video_count) {
+                    video = openvideodevice(video_device);
+                    if(video) {
                         video_on = video_startread();
+                    } else {
+                        video_on = 0;
                     }
                 } else {
+                    // open the video device to get some info e.g. frame size
+                    // close it afterwards to not block the device while it is not used
+                    if (openvideodevice(video_device)) {
+                        closevideodevice(video_device);
+                    }
+                    video = 0;
                     video_on = 0;
                 }
 
@@ -187,45 +209,76 @@ static void video_thread(void *args)
                 break;
             }
 
+            // VIDEO_PREVIEW_START: a video preview has been opened
             case VIDEO_PREVIEW_START: {
                 preview = 1;
                 video_count++;
+                debug("preview start %u\n", video_count);
+                // open device if not opended already
+                if (video_device && !video) {
+                    video = openvideodevice(video_device);
+                    newinput = 1;
+                }
+                // if video device is successfully opended, start capturing
                 if(video && !video_on) {
                     video_on = video_startread();
                 }
                 break;
             }
 
+            // VIDEO_CALL_START: a video call has started
             case VIDEO_CALL_START: {
                 call[m->param1] = 1;
                 video_count++;
+                debug("call start %u\n", video_count);
+                // open device if not opended already
+                if (video_device && !video) {
+                    video = openvideodevice(video_device);
+                    newinput = 1;
+                }
+                // if video device is successfully opended, start capturing
                 if(video && !video_on) {
                     video_on = video_startread();
                 }
                 break;
             }
 
+            // VIDEO_PREVIEW_END: a video preview has ended
             VIDEO_PREVIEW_END:
             case VIDEO_PREVIEW_END: {
                 debug("preview end %u\n", video_count);
                 preview = 0;
                 video_count--;
+                // if this was the last call/preview, stop capturing
                 if(!video_count && video_on) {
                     video_endread();
                     video_on = 0;
                 }
+                // if this was the last call/preview, close the device
+                if(!video_count && video) {
+                    closevideodevice(video_device);
+                    video = 0;
+                }
                 break;
             }
 
+            // VIDEO_CALL_END: a video call has ended
             case VIDEO_CALL_END: {
+                debug("call end %u\n", video_count);
                 if(!call[m->param1]) {
                     break;
                 }
                 call[m->param1] = 0;
                 video_count--;
+                // if this was the last call/preview, stop capturing
                 if(!video_count && video_on) {
                     video_endread();
                     video_on = 0;
+                }
+                // if this was the last call/preview, close the device
+                if(!video_count && video) {
+                    closevideodevice(video_device);
+                    video = 0;
                 }
                 break;
             }
@@ -235,6 +288,7 @@ static void video_thread(void *args)
         }
 
         if(video_on) {
+            // capturing is enabled, capture frames
             int r = video_getframe(input.planes[0], input.planes[1], input.planes[2], input.d_w, input.d_h);
             if(r == 1) {
                 if(preview) {
@@ -765,7 +819,7 @@ static void audio_thread(void *args)
                 if (f_a) {
                     int ret = filter_audio(f_a, (int16_t*)buf, perframe);
 
-                    if (ret == -1) { 
+                    if (ret == -1) {
                         debug("filter audio error\n");
                     }
 
