@@ -364,7 +364,7 @@ void* video_detect(void) {
 
 + (NSWindow *)createWindow {
 #define START_RECT (CGRect){0, 0, 100, 100}
-    NSWindow *ret = [[uToxIroncladWindow alloc] initWithContentRect:START_RECT styleMask:NSHUDWindowMask | NSUtilityWindowMask | NSClosableWindowMask | NSTitledWindowMask backing:NSBackingStoreBuffered defer:YES];
+    NSWindow *ret = [[uToxIroncladWindow alloc] initWithContentRect:START_RECT styleMask:NSHUDWindowMask | NSUtilityWindowMask | NSClosableWindowMask | NSTitledWindowMask | NSResizableWindowMask backing:NSBackingStoreBuffered defer:YES];
     ret.hidesOnDeactivate = NO;
     uToxIroncladView *iv = [[self alloc] initWithFrame:ret.frame];
     ret.contentView = iv;
