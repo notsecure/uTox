@@ -5,6 +5,14 @@
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
 
+#ifndef NS_DESIGNATED_INITIALIZER
+#if __has_attribute(objc_designated_initializer)
+#define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
+#else
+#define NS_DESIGNATED_INITIALIZER
+#endif
+#endif
+
 @class uToxStardustView;
 extern CGDirectDisplayID desktop_capture_from;
 extern CGRect desktop_capture_rect;
@@ -25,7 +33,7 @@ void setup_cursors(void);
 
 #define MAC_OS_AT_LEAST_DO(a, b, c) \
     if ([[NSProcessInfo processInfo] respondsToSelector:@selector(isOperatingSystemAtLeastVersion:)] && \
-        [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){a, b, c}])
+        [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:/*(NSOperatingSystemVersion)*/{a, b, c}])
 #define AT_LEAST_YOSEMITE_DO      MAC_OS_AT_LEAST_DO(10, 10, 0)
 
 // gotta use the old version checker here

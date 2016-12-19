@@ -134,13 +134,16 @@ msgid(AUDIOINPUTDEVICE)
 msgstr("Audio Input Device")
 
 msgid(AUDIOFILTERING)
-msgstr("Filter Audio")
+msgstr("Audio Filtering")
 
 msgid(AUDIOOUTPUTDEVICE)
 msgstr("Audio Output Device")
 
 msgid(VIDEOINPUTDEVICE)
 msgstr("Video Input Device")
+
+msgid(PUSH_TO_TALK)
+msgstr("Push To Talk")
 
 msgid(OTHERSETTINGS)
 msgstr("Other Settings")
@@ -246,6 +249,9 @@ msgstr("Accept")
 
 msgid(IGNORE)
 msgstr("Ignore")
+
+msgid(SET_ALIAS)
+msgstr("Set alias")
 
 msgid(SENDSCREENSHOT)
 msgstr("Send a screenshot")
