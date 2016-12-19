@@ -112,11 +112,13 @@ static void callback_typing_change(Tox *UNUSED(tox), uint32_t fid, _Bool is_typi
     debug("Friend Typing (%u): %u\n", fid, is_typing);
 }
 
-static void callback_read_receipt(Tox *UNUSED(tox), uint32_t fid, uint32_t receipt, void *UNUSED(userdata))
+static void callback_read_receipt(Tox* tox, uint32_t fid, uint32_t receipt, void *UNUSED(userdata))
 {
-    //postmessage(FRIEND_RECEIPT, fid, receipt);
+   // postmessage(FRIEND_RECEIPT, fid, receipt, NULL);
+   
+   tox_message (FRIEND_RECEIPT, fid, receipt, 0);
 
-    debug("Friend Receipt (%u): %u\n", fid, receipt);
+    debug("Friend Receipt (%u): %u \n", fid, receipt);
 }
 
 static void callback_connection_status(Tox *tox, uint32_t fid, TOX_CONNECTION status, void *UNUSED(userdata)){
