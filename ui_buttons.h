@@ -498,6 +498,16 @@ static void button_chat_send_update(BUTTON *b){
     }
 }
 
+extern _Bool moving_window_with_mouse;
+static void button_move_window_onup(void){
+    moving_window_with_mouse = 0;
+}
+
+static void button_move_window_onpress(void){
+    moving_window_with_mouse = 1;
+    mouse.start_x = mouse.x;
+    mouse.start_y = mouse.y;
+}
 
 BUTTON button_settings_sub_profile = {
     .nodraw       = 1,
@@ -699,4 +709,10 @@ button_statusmsg = {
 button_status = {
     .nodraw = 1,
     .onpress = button_status_onpress,
+},
+
+button_move_window = {
+    .nodraw      = 1,
+    .onpressdown = button_move_window_onpress,
+    .onpress = button_move_window_onup,
 };

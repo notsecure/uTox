@@ -9,6 +9,7 @@ _Bool draw = 0;
 float scale = 1.0;
 _Bool connected = 0;
 _Bool havefocus;
+_Bool moving_window_with_mouse = 0;
 
 
 BLENDFUNCTION blend_function = {
@@ -1365,7 +1366,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR cmd, int n
     /* needed if/when the uTox becomes a muTox */
     //wmemmove(title, title+1, wcslen(title));
 
-    hwnd = CreateWindowExW(0, classname, title, WS_OVERLAPPEDWINDOW, save->window_x, save->window_y, MAIN_WIDTH, MAIN_HEIGHT, NULL, NULL, hInstance, NULL);
+
+    hwnd = CreateWindowExW( WS_EX_APPWINDOW, classname, title,
+                            WS_POPUP | WS_VISIBLE,
+                            save->window_x, save->window_y, MAIN_WIDTH, MAIN_HEIGHT,
+                            NULL, NULL, hinstance, NULL);
+
+    // hwnd = CreateWindowExW(  0, classname, title, WS_OVERLAPPEDWINDOW, save->window_x, save->window_y,
+    //                          MAIN_WIDTH, MAIN_HEIGHT, NULL, NULL, hInstance, NULL);
 
     free(save);
 
@@ -1530,7 +1538,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         }
 
-        int w, h;
+        int x, y, w, h;
 
         w = GET_X_LPARAM(lParam);
         h = GET_Y_LPARAM(lParam);
@@ -1538,13 +1546,17 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         if(w != 0) {
             RECT r;
             GetClientRect(hwn, &r);
+            x = r.left;
+            y = r.top;
             w = r.right;
             h = r.bottom;
 
+            utox_window_x = x;
+            utox_window_y = y;
             utox_window_width = w;
             utox_window_height = h;
 
-            debug("%u %u\n", w, h);
+            debug("x %u & y %u @ %ux%u\n", x, y, w, h);
 
             ui_scale(dropdown_dpi.selected + 1);
             ui_size(w, h);
@@ -1663,6 +1675,10 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         mx = x;
         my = y;
 
+        if (moving_window_with_mouse && mouse.down){
+            os_window_interactions(0, x - mouse.start_x, y - mouse.start_y);
+        }
+
         cursor = 0;
         panel_mmove(&panel_root, 0, 0, utox_window_width, utox_window_height, x, y, dx, dy);
 
@@ -1697,6 +1713,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
 
         SetCapture(hwn);
         mdown = 1;
+        mouse.down = 1;
         break;
     }
 
@@ -1710,6 +1727,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
     }
 
     case WM_LBUTTONUP: {
+        moving_window_with_mouse = 0;
         ReleaseCapture();
         break;
     }
@@ -1718,6 +1736,7 @@ LRESULT CALLBACK WindowProc(HWND hwn, UINT msg, WPARAM wParam, LPARAM lParam)
         if (mdown) {
             panel_mup(&panel_root);
             mdown = 0;
+            mouse.down = 0;
         }
 
         break;

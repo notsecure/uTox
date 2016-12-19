@@ -377,6 +377,18 @@ static _Bool background_mwheel(PANEL *UNUSED(p), int UNUSED(height), double UNUS
 static _Bool background_mup(PANEL *UNUSED(p)) { return 0; }
 static _Bool background_mleave(PANEL *UNUSED(p)) { return 0; }
 
+
+static void mmove_window(BUTTON *b, int x, int y, int w, int h, int mx, int my, int dx, int dy){
+    if ( b->mouseover && b->mousedown ){
+        if( dx || dy) {
+            // debug("mm mouse dy = %i\n", dy);
+            // os_window_interactions(1, dx, dy > 0 ? 2 : dy < 0 ? -2 : 0 );
+
+        }
+    }
+}
+
+
 // Scrollbar or friend list
 SCROLLABLE scrollbar_roster = {
     .panel = {
@@ -602,6 +614,7 @@ panel_main = {
             .drawfunc = draw_change_profile,
             .child = (PANEL*[]) {
                 /* Does nothing for now... sorry about that */
+                (void*)&button_move_window,
                 NULL
             }
         },
@@ -957,6 +970,14 @@ void ui_scale(uint8_t scale)
             .y = SELF_STATUS_Y,
             .width = BM_STATUSAREA_WIDTH,
             .height = BM_STATUSAREA_HEIGHT,
+        },
+
+        b_move_window = {
+            .type = PANEL_BUTTON,
+            .x = X_MAIN_LEFT,
+            .y = SELF_STATUS_Y,
+            .width = 100 * SCALE,
+            .height = 50 * SCALE,
         };
 
     /* Set the button panels */
@@ -987,6 +1008,8 @@ void ui_scale(uint8_t scale)
         button_name.panel = b_name;
         button_statusmsg.panel = b_statusmsg;
         button_status.panel = b_status;
+
+        button_move_window.panel = b_move_window;
 
     /* Drop down structs */
         PANEL d_notifications = {
@@ -1409,6 +1432,7 @@ _Bool panel_mmove(PANEL *p, int x, int y, int width, int height, int mx, int my,
     }
 
     _Bool draw = p->type ? mmovefunc[p->type - 1](p, x, y, width, height, mx, mmy, dx, dy) : 0;
+
     // Has to be called before children mmove
     if (p == &panel_root) {
         draw |= tooltip_mmove();
