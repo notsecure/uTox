@@ -254,7 +254,11 @@ void friend_meta_data_read(Tox *tox, int friend_id)
     memcpy(metadata, mdata, sizeof(*metadata));
     if (metadata->alias_length) {
         friend_set_alias(&friend[friend_id], mdata + sizeof(size_t), metadata->alias_length);
+    } else {
+        friend_set_alias(&friend[friend_id], NULL, 0); /* uTox depends on this being 0/NULL if there's no alias. */
     }
+    free(metadata);
+    free(mdata);
 }
 
 static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, uint32_t param1, uint32_t param2, void *data);
@@ -664,8 +668,11 @@ void tox_thread(void *UNUSED(args))
 
         // Start the treads
         thread(audio_thread, av);
+        while(!audio_thread_init) yieldcpu(1);
         thread(video_thread, av);
+        while(!video_thread_init) yieldcpu(1);
         thread(toxav_thread, av);
+        while(!toxav_thread_init) yieldcpu(1);
 
         //
         _Bool connected = 0;
@@ -1061,7 +1068,8 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
         break;
     }
 
-    case TOX_SEND_NEW_FILE: {
+    case TOX_SEND_NEW_FILE:
+    case TOX_SEND_NEW_FILE_SLASH:{
         /* param1: friend #
          * param2: offset of first file name in data
          * data: file names
@@ -1123,7 +1131,9 @@ static void tox_thread_message(Tox *tox, ToxAv *av, uint64_t time, uint8_t msg, 
             }
         }
 
-        free(data);
+        if(msg != TOX_SEND_NEW_FILE_SLASH){
+            free(data);
+        }
 
         break;
     }

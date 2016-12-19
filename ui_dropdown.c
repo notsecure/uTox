@@ -39,6 +39,8 @@ static void dropdown_dpi_onselect(uint16_t i, const DROPDOWN* UNUSED(dm))
 static void dropdown_language_onselect(uint16_t i, const DROPDOWN* UNUSED(dm))
 {
     LANG = (UI_LANG_ID)i;
+    /* The draw functions need the fonts' and scale to be reset when changing languages. */
+    ui_scale(SCALE);
 }
 static STRING* dropdown_language_ondisplay(uint16_t i, const DROPDOWN* UNUSED(dm))
 {
@@ -127,6 +129,15 @@ static void dropdown_auto_startup_onselect(uint16_t i, const DROPDOWN* UNUSED(dm
 static void dropdown_typing_notes_onselect(const uint16_t i, const DROPDOWN* UNUSED(dm)) {
     dont_send_typing_notes = i;
     debug("Typing notifications preference: %hu\n", i);
+}
+
+static void dropdown_push_to_talk_onselect(const uint16_t i, const DROPDOWN* UNUSED(dm)) {
+    if (i) {
+        // TODO, push this onto the start and end call fxn?
+        init_ptt();
+    } else {
+        exit_ptt();
+    }
 }
 
 static UI_STRING_ID dpidrops[] = {
@@ -274,4 +285,11 @@ dropdown_audio_filtering = {
     .onselect = dropdown_audio_filtering_onselect,
     .dropcount = countof(offondrops),
     .userdata = offondrops
+},
+
+dropdown_push_to_talk = {
+    .ondisplay = simple_dropdown_ondisplay,
+    .onselect  = dropdown_push_to_talk_onselect,
+    .dropcount = countof(offondrops),
+    .userdata  = offondrops
 };

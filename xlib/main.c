@@ -184,6 +184,82 @@ void postmessage(uint32_t msg, uint16_t param1, uint16_t param2, void *data)
     XFlush(display);
 }
 
+
+#include <linux/input.h>
+FILE *ptt_keyboard_handle;
+Display *ptt_display;
+void init_ptt(void){
+    push_to_talk = 1;
+    uint8_t path[UTOX_FILE_NAME_LENGTH], *p;
+    p = path + datapath(path);
+    strcpy((char*)p, "ptt-kbd");
+
+    ptt_keyboard_handle = fopen((const char*)path, "r");
+    if (!ptt_keyboard_handle){
+        debug("Could not access ptt-kbd in data directory\n");
+        ptt_display = XOpenDisplay(0);
+        XSynchronize(ptt_display, TRUE);
+    }
+
+}
+
+_Bool check_ptt_key(void){
+    if (!push_to_talk) {
+        // debug("PTT is disabled\n");
+        return 1; /* If push to talk is disabled, return true. */
+    }
+    int ptt_key;
+
+    /* First, we try for direct access to the keyboard. */
+    ptt_key = KEY_LEFTCTRL;                                      // TODO allow user to change this...
+    if (ptt_keyboard_handle) {
+        /* Nice! we have direct access to the keyboard! */
+        char key_map[KEY_MAX/8 + 1];                             // Create a byte array the size of the number of keys
+        memset(key_map, 0, sizeof(key_map));
+        ioctl(fileno(ptt_keyboard_handle), EVIOCGKEY(sizeof(key_map)), key_map); // Fill the keymap with the current keyboard state
+        int keyb = key_map[ptt_key/8];                           // The key we want (and the seven others around it)
+        int mask = 1 << (ptt_key % 8);                           // Put 1 in the same column as our key state
+
+        if (keyb & mask){
+            // debug("PTT key is down\n");
+            return 1;
+        } else {
+            // debug("PTT key is up\n");
+            return 0;
+        }
+    }
+    /* Okay nope, lets' fallback to xinput... *pouts*
+     * Fall back to Querying the X for the current keymap. */
+    ptt_key = XKeysymToKeycode(display, XK_Control_L);
+    char keys[32] = {0};
+    /* We need our own connection, so that we don't block the main display... No idea why... */
+    if ( ptt_display ) {
+        XQueryKeymap(ptt_display, keys);
+        if (keys[ptt_key/8] & (0x1 << ( ptt_key % 8 ))) {
+            // debug("PTT key is down (according to XQueryKeymap\n");
+            return 1;
+        } else {
+            // debug("PTT key is up (according to XQueryKeymap\n");
+            return 0;
+        }
+    }
+    /* Couldn't access the keyboard directly, and XQuery failed, this is really bad! */
+    debug("Unable to access keyboard, you need to read the manual on how to enable utox to\nhave access to your key"
+          "board.\nDisable push to talk to suppress this message.\n");
+    return 0;
+
+}
+
+void exit_ptt(void){
+    if (ptt_keyboard_handle){
+        fclose(ptt_keyboard_handle);
+    }
+    if (ptt_display) {
+        XCloseDisplay(ptt_display);
+    }
+    push_to_talk = 0;
+}
+
 void image_set_scale(UTOX_NATIVE_IMAGE *image, double scale)
 {
     uint32_t r = (uint32_t)(65536.0 / scale);
@@ -839,16 +915,11 @@ void setscale(void)
 
     svg_draw(0);
 
-    freefonts();
-    loadfonts();
-
-    font_small_lineheight = (font[FONT_TEXT].info[0].face->size->metrics.height + (1 << 5)) >> 6;
-    //font_msg_lineheight = (font[FONT_MSG].info[0].face->size->metrics.height + (1 << 5)) >> 6;
-
     if(xsh) {
         XFree(xsh);
     }
 
+    // TODO, fork this to a function
     xsh = XAllocSizeHints();
     xsh->flags = PMinSize;
     xsh->min_width = 320 * SCALE;
@@ -861,6 +932,15 @@ void setscale(void)
         /* wont get a resize event, call this manually */
         ui_size(utox_window_width, utox_window_height);
     }
+}
+
+void setscale_fonts(void)
+{
+    freefonts();
+    loadfonts();
+
+    font_small_lineheight = (font[FONT_TEXT].info[0].face->size->metrics.height + (1 << 5)) >> 6;
+    //font_msg_lineheight = (font[FONT_MSG].info[0].face->size->metrics.height + (1 << 5)) >> 6;
 }
 
 int file_lock(FILE *file, uint64_t start, size_t length){
@@ -995,7 +1075,7 @@ int main(int argc, char *argv[])
     /* Variables for --set */
     int32_t set_show_window = 0;
 
-    if (argc > 1)
+    if (argc > 1) {
         for (int i = 1; i < argc; i++) {
             if(parse_args_wait_for_theme) {
                 if(!strcmp(argv[i], "default")) {
@@ -1062,6 +1142,7 @@ int main(int argc, char *argv[])
             }
             printf("arg %d: %s\n", i, argv[i]);
         }
+    }
 
     if (parse_args_wait_for_theme) {
         debug("Expected theme name, but got nothing. -_-\n");
@@ -1082,6 +1163,9 @@ int main(int argc, char *argv[])
         printf("Cannot open input method\n");
     }
 
+    LANG = systemlang();
+    dropdown_language.selected = dropdown_language.over = LANG;
+
     screen = DefaultScreen(display);
     cmap = DefaultColormap(display, screen);
     visual = DefaultVisual(display, screen);
@@ -1100,8 +1184,9 @@ int main(int argc, char *argv[])
     /* load save data */
     UTOX_SAVE *save = config_load();
 
-    if (!theme_was_set_on_argv)
+    if (!theme_was_set_on_argv) {
         theme = save->theme;
+    }
     printf("%d\n", theme);
     theme_load(theme);
 
@@ -1173,6 +1258,10 @@ int main(int argc, char *argv[])
     /* initialize fontconfig */
     initfonts();
 
+    /* Set the default font so we don't segfault on ui_scale() when it goes looking for fonts. */
+    loadfonts();
+    setfont(FONT_TEXT);
+
     /* load fonts and scalable bitmaps */
     ui_scale(save->scale + 1);
 
@@ -1210,9 +1299,6 @@ int main(int argc, char *argv[])
     xrcolor.blue = 0x0;
     xrcolor.alpha = 0xffff;
     XftColorAllocValue(display, visual, cmap, &xrcolor, &xftcolor);*/
-
-    LANG = systemlang();
-    dropdown_language.selected = dropdown_language.over = LANG;
 
     if(set_show_window){
         if(set_show_window == 1){
